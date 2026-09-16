@@ -1,0 +1,62 @@
+# Unity-generated data; keep Assets, Packages and ProjectSettings
+/unity/[Ll]ibrary/
+/unity/[Tt]emp/
+/unity/[Oo]bj/
+/unity/[Ll]ogs/
+/unity/[Uu]ser[Ss]ettings/
+/unity/[Bb]uild/
+/unity/[Bb]uilds/
+/unity/[Mm]emoryCaptures/
+/unity/[Rr]ecordings/
+/unity/.vs/
+/unity/.vscode/
+/unity/.idea/
+/unity/*.csproj
+/unity/*.sln
+/unity/*.slnx
+/unity/*.user
+
+# Arduino / ESP32 local configuration
+/firmware/**/secrets.h
+/firmware/**/config.local.h
+
+# Optional local Arduino build output
+/firmware/build/
+
+# .NET standalone test output
+**/bin/
+**/obj/
+**/TestResults/
+
+# Python environments and caches
+**/.venv/
+**/__pycache__/
+**/.pytest_cache/
+**/.ruff_cache/
+**/.ipynb_checkpoints/
+**/*.egg-info/
+/analysis/build/
+/analysis/dist/
+
+# Developer/station-specific data and generated artifacts
+/config/local.json
+/config/station.local.json
+/config/secrets.local.json
+.env
+.env.local
+*.local.json
+/artifacts/
+/exports/
+/captures/
+/data-local/
+/firmware/provisioning-output/
+/.vscode/settings.json
+*.keystore
+*.jks
+*.ulf
+*.alf
+
+# Operating-system files
+.DS_Store
+Thumbs.db
+Desktop.ini
