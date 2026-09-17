@@ -21,6 +21,8 @@ namespace WeldingTrainer.Prototype
         private const float MinimumGoodSpeed = 0.05f;
         private const float MaximumGoodSpeed = 0.15f;
         private const float CompletionThreshold = 0.97f;
+        private const float MinimumCalibrationLength = 0.15f;
+        private const float MaximumCalibrationLength = 1.5f;
         private const float PositionSmoothing = 16f;
         private const float SpeedSmoothing = 10f;
 
@@ -55,7 +57,11 @@ namespace WeldingTrainer.Prototype
         private bool _seamPlaced;
         private bool _completed;
         private bool _resetWasPressed;
+        private bool _calibrateWasPressed;
         private bool _sessionSaved;
+        private bool _isCalibrating;
+        private Vector3 _calibrationStart;
+        private string _calibrationMessage;
         private PrototypeSessionRecorder _recorder;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -90,6 +96,7 @@ namespace WeldingTrainer.Prototype
             }
 
             bool resetPressed;
+            bool calibratePressed;
             bool triggerPressed;
             bool trackingValid;
             Vector3 rawToolPosition;
@@ -104,7 +111,8 @@ namespace WeldingTrainer.Prototype
                     out rawToolPosition,
                     out rawToolRotation,
                     out triggerPressed,
-                    out resetPressed);
+                    out resetPressed,
+                    out calibratePressed);
             }
             else
 #endif
@@ -114,7 +122,8 @@ namespace WeldingTrainer.Prototype
                     out rawToolPosition,
                     out rawToolRotation,
                     out triggerPressed,
-                    out resetPressed);
+                    out resetPressed,
+                    out calibratePressed);
             }
 
             if (resetPressed && !_resetWasPressed)
@@ -128,6 +137,7 @@ namespace WeldingTrainer.Prototype
                 _hasPreviousPosition = false;
                 SetToolColour(BadColour);
                 SetHud("Controller tracking unavailable\nMove or wake the right controller");
+                _calibrateWasPressed = calibratePressed;
                 return;
             }
 
@@ -137,6 +147,22 @@ namespace WeldingTrainer.Prototype
                 : rawToolPosition;
 
             _toolTip.SetPositionAndRotation(_smoothedToolPosition, rawToolRotation);
+
+            if (calibratePressed && !_calibrateWasPressed)
+            {
+                HandleCalibration(_smoothedToolPosition);
+            }
+            _calibrateWasPressed = calibratePressed;
+
+            if (_isCalibrating)
+            {
+                _hasPreviousPosition = false;
+                SetToolColour(GuideColour);
+                SetGuideColour(GuideColour);
+                SetHud(_calibrationMessage);
+                return;
+            }
+
             UpdateEvaluation(triggerPressed);
         }
 
@@ -253,7 +279,7 @@ namespace WeldingTrainer.Prototype
                     ? "Results saved locally"
                     : "Result save failed - see Console";
                 return string.Format(
-                    "WELD COMPLETE\nCompletion: 100%\nAverage error: {0:0.0} cm\nAverage speed: {1:0.0} cm/s\nGood samples: {2:0}%\n{3}\nPress B or R to reset",
+                    "WELD COMPLETE\nCompletion: 100%\nAverage error: {0:0.0} cm\nAverage speed: {1:0.0} cm/s\nGood samples: {2:0}%\n{3}\nPress B or R to reset\nPress A or C to place a new seam",
                     averageError * 100f,
                     averageSpeed * 100f,
                     quality,
@@ -275,7 +301,7 @@ namespace WeldingTrainer.Prototype
                 : "Hold trigger to weld";
 
             return string.Format(
-                "{0}\n{1}\nError: {2:0.0} cm\nProgress: {3:0}%\n{4}",
+                "{0}\n{1}\nError: {2:0.0} cm\nProgress: {3:0}%\n{4}\nPress A or C to place seam",
                 positionLabel,
                 speedLabel,
                 distance * 100f,
@@ -288,7 +314,8 @@ namespace WeldingTrainer.Prototype
             out Vector3 worldPosition,
             out Quaternion worldRotation,
             out bool triggerPressed,
-            out bool resetPressed)
+            out bool resetPressed,
+            out bool calibratePressed)
         {
             EnsureDevice(ref _rightController, XRNode.RightHand);
             EnsureDevice(ref _leftController, XRNode.LeftHand);
@@ -329,6 +356,9 @@ namespace WeldingTrainer.Prototype
             resetPressed =
                 _rightController.TryGetFeatureValue(CommonUsages.secondaryButton, out bool secondary)
                     && secondary;
+            calibratePressed =
+                _rightController.TryGetFeatureValue(CommonUsages.primaryButton, out bool primary)
+                    && primary;
         }
 
 #if UNITY_EDITOR
@@ -337,7 +367,8 @@ namespace WeldingTrainer.Prototype
             out Vector3 worldPosition,
             out Quaternion worldRotation,
             out bool triggerPressed,
-            out bool resetPressed)
+            out bool resetPressed,
+            out bool calibratePressed)
         {
             Keyboard keyboard = Keyboard.current;
             float movementSpeed = keyboard.leftShiftKey.isPressed ? 0.35f : 0.12f;
@@ -361,6 +392,7 @@ namespace WeldingTrainer.Prototype
             worldRotation = Quaternion.identity;
             triggerPressed = keyboard.spaceKey.isPressed;
             resetPressed = keyboard.rKey.wasPressedThisFrame;
+            calibratePressed = keyboard.cKey.wasPressedThisFrame;
         }
 #endif
 
@@ -423,6 +455,7 @@ namespace WeldingTrainer.Prototype
         private void ResetAttempt()
         {
             FinishRecording(false, "reset");
+            _isCalibrating = false;
             _beadProgress = 0f;
             _errorSum = 0f;
             _speedSum = 0f;
@@ -432,8 +465,48 @@ namespace WeldingTrainer.Prototype
             _hasPreviousPosition = false;
             _completed = false;
             _sessionSaved = false;
+            _guide.SetPosition(0, _seamStart);
+            _guide.SetPosition(1, _seamEnd);
             UpdateBead();
             BeginRecording();
+        }
+
+        private void HandleCalibration(Vector3 toolPosition)
+        {
+            if (!_isCalibrating)
+            {
+                FinishRecording(false, "recalibration_started");
+                _isCalibrating = true;
+                _calibrationStart = toolPosition;
+                _guide.SetPosition(0, _calibrationStart);
+                _guide.SetPosition(1, _calibrationStart);
+                _bead.enabled = false;
+                _calibrationMessage =
+                    "SEAM PLACEMENT\nStart captured\nMove the tool to the seam end\nand press A or C again";
+                return;
+            }
+
+            float length = Vector3.Distance(_calibrationStart, toolPosition);
+            if (length < MinimumCalibrationLength)
+            {
+                _calibrationMessage =
+                    "SEAM PLACEMENT\nEnd is too close to start\nUse at least 15 cm\nand press A or C again";
+                return;
+            }
+
+            if (length > MaximumCalibrationLength)
+            {
+                _calibrationMessage =
+                    "SEAM PLACEMENT\nEnd is too far from start\nUse less than 1.5 m\nand press A or C again";
+                return;
+            }
+
+            _seamStart = _calibrationStart;
+            _seamEnd = toolPosition;
+            _guide.SetPosition(0, _seamStart);
+            _guide.SetPosition(1, _seamEnd);
+            _isCalibrating = false;
+            ResetAttempt();
         }
 
         private void BeginRecording()
