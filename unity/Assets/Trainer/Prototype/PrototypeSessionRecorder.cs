@@ -72,7 +72,9 @@ namespace WeldingTrainer.Prototype
             float completion,
             float averageErrorMetres,
             float averageSpeedMetresPerSecond,
-            float goodSamplePercent)
+            float goodSamplePercent,
+            int trackingInterruptionCount,
+            float invalidTrackingSeconds)
         {
             if (!IsActive)
             {
@@ -86,7 +88,7 @@ namespace WeldingTrainer.Prototype
 
             var summary = new SummaryRecord
             {
-                schemaVersion = 2,
+                schemaVersion = 3,
                 sessionId = _sessionId,
                 startedUtc = _startedUtc,
                 finishedUtc = DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture),
@@ -96,6 +98,8 @@ namespace WeldingTrainer.Prototype
                 averageErrorMetres = averageErrorMetres,
                 averageSpeedMetresPerSecond = averageSpeedMetresPerSecond,
                 goodSamplePercent = goodSamplePercent,
+                trackingInterruptionCount = trackingInterruptionCount,
+                invalidTrackingSeconds = invalidTrackingSeconds,
                 sampleCount = _samples.Count
             };
 
@@ -157,6 +161,8 @@ namespace WeldingTrainer.Prototype
             public float averageErrorMetres;
             public float averageSpeedMetresPerSecond;
             public float goodSamplePercent;
+            public int trackingInterruptionCount;
+            public float invalidTrackingSeconds;
             public int sampleCount;
         }
 
