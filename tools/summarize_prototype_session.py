@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 
-SUPPORTED_SCHEMA_VERSIONS = {2, 3, 4, 5}
+SUPPORTED_SCHEMA_VERSIONS = {2, 3, 4, 5, 6}
 REQUIRED_SUMMARY_FIELDS = (
     "schemaVersion",
     "sessionId",
@@ -43,6 +43,22 @@ def finite_number(value: Any, field: str, errors: list[str]) -> float | None:
         errors.append(f"{field} must be finite: {value!r}")
         return None
     return number
+
+
+def vector3(
+    value: Any, field: str, errors: list[str]
+) -> tuple[float, float, float] | None:
+    if not isinstance(value, dict):
+        errors.append(f"{field} must be an object with x, y, and z")
+        return None
+
+    components = tuple(
+        finite_number(value.get(axis), f"{field}.{axis}", errors)
+        for axis in ("x", "y", "z")
+    )
+    if any(component is None for component in components):
+        return None
+    return components  # type: ignore[return-value]
 
 
 def validate_session(session_path: Path) -> tuple[dict[str, Any], list[str], list[str]]:
@@ -103,6 +119,105 @@ def validate_session(session_path: Path) -> tuple[dict[str, Any], list[str], lis
     )
     if quality_field not in summary:
         errors.append(f"schema {schema_version} summary is missing {quality_field}")
+
+    configuration = summary.get("configuration")
+    configuration_report: dict[str, Any] = {}
+    if isinstance(schema_version, int) and schema_version >= 6:
+        if not isinstance(configuration, dict):
+            errors.append(f"schema {schema_version} summary is missing configuration")
+        else:
+            for field in (
+                "evaluatorVersion",
+                "applicationVersion",
+                "unityVersion",
+                "runtimePlatform",
+            ):
+                if not isinstance(configuration.get(field), str) or not configuration.get(field):
+                    errors.append(f"configuration.{field} must be a non-empty string")
+
+            seam_start = vector3(
+                configuration.get("seamStartWorldMetres"),
+                "configuration.seamStartWorldMetres",
+                errors,
+            )
+            seam_end = vector3(
+                configuration.get("seamEndWorldMetres"),
+                "configuration.seamEndWorldMetres",
+                errors,
+            )
+            vector3(
+                configuration.get("controllerToTipOffsetMetres"),
+                "configuration.controllerToTipOffsetMetres",
+                errors,
+            )
+            vector3(
+                configuration.get("localToolForwardAxis"),
+                "configuration.localToolForwardAxis",
+                errors,
+            )
+
+            numeric_configuration: dict[str, float | None] = {}
+            for field in (
+                "goodDistanceMetres",
+                "maximumWeldDistanceMetres",
+                "minimumGoodSpeedMetresPerSecond",
+                "maximumGoodSpeedMetresPerSecond",
+                "completionThreshold",
+                "startProgressThreshold",
+                "maximumProgressJump",
+                "reverseProgressTolerance",
+                "targetTravelAngleDegrees",
+                "travelAngleToleranceDegrees",
+                "targetWorkAngleDegrees",
+                "workAngleToleranceDegrees",
+            ):
+                numeric_configuration[field] = finite_number(
+                    configuration.get(field), f"configuration.{field}", errors
+                )
+                value = numeric_configuration[field]
+                if value is not None and value < 0:
+                    errors.append(f"configuration.{field} cannot be negative")
+
+            for field in ("evaluateOrientation", "orientationInhibitsWelding"):
+                if not isinstance(configuration.get(field), bool):
+                    errors.append(f"configuration.{field} must be a boolean")
+
+            good_distance = numeric_configuration["goodDistanceMetres"]
+            maximum_distance = numeric_configuration["maximumWeldDistanceMetres"]
+            minimum_speed = numeric_configuration["minimumGoodSpeedMetresPerSecond"]
+            maximum_speed = numeric_configuration["maximumGoodSpeedMetresPerSecond"]
+            if (
+                good_distance is not None
+                and maximum_distance is not None
+                and good_distance > maximum_distance
+            ):
+                errors.append("configuration good distance exceeds maximum weld distance")
+            if (
+                minimum_speed is not None
+                and maximum_speed is not None
+                and minimum_speed > maximum_speed
+            ):
+                errors.append("configuration minimum speed exceeds maximum speed")
+
+            seam_length = None
+            if seam_start is not None and seam_end is not None:
+                seam_length = math.sqrt(
+                    sum((end - start) ** 2 for start, end in zip(seam_start, seam_end))
+                )
+                if seam_length <= 0:
+                    errors.append("configuration seam length must be greater than zero")
+
+            configuration_report = {
+                "evaluatorVersion": configuration.get("evaluatorVersion"),
+                "applicationVersion": configuration.get("applicationVersion"),
+                "unityVersion": configuration.get("unityVersion"),
+                "runtimePlatform": configuration.get("runtimePlatform"),
+                "seamLengthMetres": seam_length,
+                "goodDistanceMetres": good_distance,
+                "maximumWeldDistanceMetres": maximum_distance,
+                "minimumGoodSpeedMetresPerSecond": minimum_speed,
+                "maximumGoodSpeedMetresPerSecond": maximum_speed,
+            }
 
     completion = finite_number(summary.get("completion"), "completion", errors)
     average_error = finite_number(
@@ -235,6 +350,7 @@ def validate_session(session_path: Path) -> tuple[dict[str, Any], list[str], lis
         "blockedTriggerSeconds": optional_numbers["blockedTriggerSeconds"],
         "trackingInterruptionCount": tracking_interruptions,
         "invalidTrackingSeconds": optional_numbers["invalidTrackingSeconds"],
+        "configuration": configuration_report or None,
     }
     return report, errors, warnings
 
@@ -282,6 +398,21 @@ def print_human_report(
             f"{tracking_label} interruptions, "
             f"{format_optional(report.get('invalidTrackingSeconds'), ' s')} invalid"
         )
+        configuration = report.get("configuration")
+        if configuration:
+            print(
+                "Configuration: "
+                f"{configuration.get('evaluatorVersion')}, "
+                f"seam {format_optional(configuration.get('seamLengthMetres'), ' m')}, "
+                f"distance {format_optional(configuration.get('goodDistanceMetres'), ' m')} good / "
+                f"{format_optional(configuration.get('maximumWeldDistanceMetres'), ' m')} max"
+            )
+            print(
+                "Build: "
+                f"app {configuration.get('applicationVersion')}, "
+                f"Unity {configuration.get('unityVersion')}, "
+                f"{configuration.get('runtimePlatform')}"
+            )
 
     for warning in warnings:
         print(f"WARNING: {warning}", file=sys.stderr)

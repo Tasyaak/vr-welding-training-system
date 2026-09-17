@@ -18,13 +18,15 @@ namespace WeldingTrainer.Prototype
 
         private string _sessionId;
         private string _startedUtc;
+        private ConfigurationSnapshot _configuration;
 
         public bool IsActive { get; private set; }
         public string LastSavedDirectory { get; private set; }
         public string CurrentSessionId => _sessionId;
 
-        public void Begin()
+        public void Begin(ConfigurationSnapshot configuration)
         {
+            _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
             _samples.Clear();
             _sessionId = Guid.NewGuid().ToString("N");
             _startedUtc = DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture);
@@ -91,7 +93,7 @@ namespace WeldingTrainer.Prototype
 
             var summary = new SummaryRecord
             {
-                schemaVersion = 5,
+                schemaVersion = 6,
                 sessionId = _sessionId,
                 startedUtc = _startedUtc,
                 finishedUtc = DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture),
@@ -106,6 +108,7 @@ namespace WeldingTrainer.Prototype
                 attemptElapsedSeconds = attemptElapsedSeconds,
                 weldingActiveSeconds = weldingActiveSeconds,
                 blockedTriggerSeconds = blockedTriggerSeconds,
+                configuration = _configuration,
                 sampleCount = _samples.Count
             };
 
@@ -155,6 +158,33 @@ namespace WeldingTrainer.Prototype
         }
 
         [Serializable]
+        public sealed class ConfigurationSnapshot
+        {
+            public string evaluatorVersion;
+            public string applicationVersion;
+            public string unityVersion;
+            public string runtimePlatform;
+            public Vector3 seamStartWorldMetres;
+            public Vector3 seamEndWorldMetres;
+            public Vector3 controllerToTipOffsetMetres;
+            public float goodDistanceMetres;
+            public float maximumWeldDistanceMetres;
+            public float minimumGoodSpeedMetresPerSecond;
+            public float maximumGoodSpeedMetresPerSecond;
+            public float completionThreshold;
+            public float startProgressThreshold;
+            public float maximumProgressJump;
+            public float reverseProgressTolerance;
+            public bool evaluateOrientation;
+            public bool orientationInhibitsWelding;
+            public Vector3 localToolForwardAxis;
+            public float targetTravelAngleDegrees;
+            public float travelAngleToleranceDegrees;
+            public float targetWorkAngleDegrees;
+            public float workAngleToleranceDegrees;
+        }
+
+        [Serializable]
         private sealed class SummaryRecord
         {
             public int schemaVersion;
@@ -172,6 +202,7 @@ namespace WeldingTrainer.Prototype
             public float attemptElapsedSeconds;
             public float weldingActiveSeconds;
             public float blockedTriggerSeconds;
+            public ConfigurationSnapshot configuration;
             public int sampleCount;
         }
 
