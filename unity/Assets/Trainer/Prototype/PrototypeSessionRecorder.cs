@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Security.Cryptography;
 using System.Text;
 using UnityEngine;
 
@@ -102,7 +103,7 @@ namespace WeldingTrainer.Prototype
 
             var summary = new SummaryRecord
             {
-                schemaVersion = 7,
+                schemaVersion = 8,
                 sessionId = _sessionId,
                 startedUtc = _startedUtc,
                 finishedUtc = DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture),
@@ -129,6 +130,8 @@ namespace WeldingTrainer.Prototype
             string summaryPartialPath = summaryPath + ".partial";
 
             WriteSamples(samplesPartialPath);
+            summary.samplesByteLength = new FileInfo(samplesPartialPath).Length;
+            summary.samplesSha256 = ComputeSha256(samplesPartialPath);
             WriteText(summaryPartialPath, JsonUtility.ToJson(summary, true));
             File.Move(samplesPartialPath, samplesPath);
             File.Move(summaryPartialPath, summaryPath);
@@ -137,6 +140,19 @@ namespace WeldingTrainer.Prototype
             LastRecordingTruncated = _droppedSampleCount > 0;
             Debug.Log($"Prototype session saved to: {sessionDirectory}");
             return sessionDirectory;
+        }
+
+        private static string ComputeSha256(string path)
+        {
+            using var stream = File.OpenRead(path);
+            using SHA256 sha256 = SHA256.Create();
+            byte[] hash = sha256.ComputeHash(stream);
+            var builder = new StringBuilder(hash.Length * 2);
+            foreach (byte value in hash)
+            {
+                builder.Append(value.ToString("x2", CultureInfo.InvariantCulture));
+            }
+            return builder.ToString();
         }
 
         private static void WriteText(string path, string contents)
@@ -233,6 +249,8 @@ namespace WeldingTrainer.Prototype
             public ConfigurationSnapshot configuration;
             public bool recordingTruncated;
             public int droppedSampleCount;
+            public long samplesByteLength;
+            public string samplesSha256;
             public int sampleCount;
         }
 

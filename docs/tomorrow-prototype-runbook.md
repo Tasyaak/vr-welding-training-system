@@ -150,6 +150,10 @@ and how many later samples were dropped. A truncated recording remains visible
 and analyzable, but the HUD and offline validator warn that its evidence is
 incomplete.
 
+Schema v8 adds the exact CSV byte length and SHA-256 digest to the summary. The
+offline validator recomputes both so corruption or an incomplete USB copy is
+reported before the metrics are trusted.
+
 ### Validate an exported session
 
 After copying one session directory to a computer, validate it and print its

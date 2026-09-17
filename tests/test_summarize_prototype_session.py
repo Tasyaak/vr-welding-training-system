@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
 import sys
@@ -24,7 +25,7 @@ CSV_ROWS = (
 
 
 def write_session(
-    directory: Path, sample_count: int = 2, schema_version: int = 7
+    directory: Path, sample_count: int = 2, schema_version: int = 8
 ) -> None:
     summary = {
         "schemaVersion": schema_version,
@@ -73,8 +74,13 @@ def write_session(
     if schema_version >= 7:
         summary["recordingTruncated"] = False
         summary["droppedSampleCount"] = 0
+    samples_path = directory / "samples.csv"
+    samples_path.write_text(CSV_HEADER + CSV_ROWS, encoding="utf-8")
+    if schema_version >= 8:
+        sample_bytes = samples_path.read_bytes()
+        summary["samplesByteLength"] = len(sample_bytes)
+        summary["samplesSha256"] = hashlib.sha256(sample_bytes).hexdigest()
     (directory / "summary.json").write_text(json.dumps(summary), encoding="utf-8")
-    (directory / "samples.csv").write_text(CSV_HEADER + CSV_ROWS, encoding="utf-8")
 
 
 class SessionValidatorTests(unittest.TestCase):
@@ -99,6 +105,7 @@ class SessionValidatorTests(unittest.TestCase):
         self.assertIn("Quality in range: 100.0%", result.stdout)
         self.assertIn("Timing: attempt 2.0 s", result.stdout)
         self.assertIn("prototype-straight-seam-v1, seam 0.5 m", result.stdout)
+        self.assertIn("Integrity: SHA-256 verified", result.stdout)
 
     def test_legacy_schema_four_quality_field_is_supported(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -109,7 +116,7 @@ class SessionValidatorTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("Quality in range: 100.0%", result.stdout)
 
-    def test_schema_seven_requires_configuration_snapshot(self) -> None:
+    def test_schema_eight_requires_configuration_snapshot(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             session = Path(temporary_directory)
             write_session(session)
@@ -120,7 +127,7 @@ class SessionValidatorTests(unittest.TestCase):
             result = self.run_validator(session)
 
         self.assertEqual(result.returncode, 1)
-        self.assertIn("schema 7 summary is missing configuration", result.stderr)
+        self.assertIn("schema 8 summary is missing configuration", result.stderr)
 
     def test_truncated_recording_is_reported_as_warning(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -146,6 +153,19 @@ class SessionValidatorTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 1)
         self.assertIn(".partial summary exists", result.stderr)
+
+    def test_modified_samples_fail_integrity_validation(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            session = Path(temporary_directory)
+            write_session(session)
+            samples_path = session / "samples.csv"
+            samples = samples_path.read_text(encoding="utf-8")
+            samples_path.write_text(samples.replace("0.012", "0.013"), encoding="utf-8")
+            result = self.run_validator(session)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("samples.csv SHA-256 does not match", result.stderr)
+        self.assertIn("Integrity: FAILED", result.stdout)
 
     def test_sample_count_mismatch_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import math
 import sys
@@ -11,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 
-SUPPORTED_SCHEMA_VERSIONS = {2, 3, 4, 5, 6, 7}
+SUPPORTED_SCHEMA_VERSIONS = {2, 3, 4, 5, 6, 7, 8}
 REQUIRED_SUMMARY_FIELDS = (
     "schemaVersion",
     "sessionId",
@@ -59,6 +60,14 @@ def vector3(
     if any(component is None for component in components):
         return None
     return components  # type: ignore[return-value]
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def validate_session(session_path: Path) -> tuple[dict[str, Any], list[str], list[str]]:
@@ -150,6 +159,37 @@ def validate_session(session_path: Path) -> tuple[dict[str, Any], list[str], lis
                 warnings.append(
                     f"Recording reached its capacity and dropped {dropped_sample_count} samples"
                 )
+
+    samples_integrity_verified: bool | None = None
+    if isinstance(schema_version, int) and schema_version >= 8:
+        expected_byte_length = summary.get("samplesByteLength")
+        expected_sha256 = summary.get("samplesSha256")
+        if (
+            not isinstance(expected_byte_length, int)
+            or isinstance(expected_byte_length, bool)
+            or expected_byte_length < 0
+        ):
+            errors.append("samplesByteLength must be a non-negative integer")
+        if (
+            not isinstance(expected_sha256, str)
+            or len(expected_sha256) != 64
+            or any(character not in "0123456789abcdefABCDEF" for character in expected_sha256)
+        ):
+            errors.append("samplesSha256 must be a 64-character hexadecimal SHA-256 digest")
+
+        actual_byte_length = samples_path.stat().st_size
+        actual_sha256 = sha256_file(samples_path)
+        length_matches = isinstance(expected_byte_length, int) and not isinstance(
+            expected_byte_length, bool
+        ) and expected_byte_length == actual_byte_length
+        hash_matches = isinstance(expected_sha256, str) and expected_sha256.lower() == actual_sha256
+        samples_integrity_verified = length_matches and hash_matches
+        if isinstance(expected_byte_length, int) and not length_matches:
+            errors.append(
+                f"samples.csv byte length is {actual_byte_length}, expected {expected_byte_length}"
+            )
+        if isinstance(expected_sha256, str) and not hash_matches:
+            errors.append("samples.csv SHA-256 does not match summary.json")
 
     configuration = summary.get("configuration")
     configuration_report: dict[str, Any] = {}
@@ -384,6 +424,7 @@ def validate_session(session_path: Path) -> tuple[dict[str, Any], list[str], lis
         "configuration": configuration_report or None,
         "recordingTruncated": recording_truncated,
         "droppedSampleCount": dropped_sample_count,
+        "samplesIntegrityVerified": samples_integrity_verified,
     }
     return report, errors, warnings
 
@@ -450,6 +491,11 @@ def print_human_report(
             print(
                 "Recording: TRUNCATED, "
                 f"{report.get('droppedSampleCount')} samples dropped"
+            )
+        if report.get("samplesIntegrityVerified") is not None:
+            print(
+                "Integrity: "
+                + ("SHA-256 verified" if report["samplesIntegrityVerified"] else "FAILED")
             )
 
     for warning in warnings:
