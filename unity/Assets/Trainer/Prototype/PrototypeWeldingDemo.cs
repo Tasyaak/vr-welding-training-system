@@ -81,6 +81,10 @@ namespace WeldingTrainer.Prototype
         private float _beadProgress;
         private float _errorSum;
         private float _speedSum;
+        private float _attemptStartedAt;
+        private float _attemptFinishedAt;
+        private float _weldingActiveSeconds;
+        private float _blockedTriggerSeconds;
         private int _sampleCount;
         private int _goodSampleCount;
         private float _nextHapticTime;
@@ -308,6 +312,7 @@ namespace WeldingTrainer.Prototype
             if (!_attemptStarted && triggerPressed && positionWeldable && nearStart)
             {
                 _attemptStarted = true;
+                _attemptStartedAt = Time.realtimeSinceStartup;
             }
 
             bool progressContinuous =
@@ -321,6 +326,19 @@ namespace WeldingTrainer.Prototype
                 (!evaluateOrientation || !orientationInhibitsWelding || orientationGood) &&
                 !_completed;
             bool welding = triggerPressed && activationAllowed;
+
+            if (_attemptStarted && !_completed)
+            {
+                float evaluationDelta = Mathf.Min(Time.unscaledDeltaTime, 0.25f);
+                if (welding)
+                {
+                    _weldingActiveSeconds += evaluationDelta;
+                }
+                else if (triggerPressed)
+                {
+                    _blockedTriggerSeconds += evaluationDelta;
+                }
+            }
 
             if (_recorder != null &&
                 _recorder.IsActive &&
@@ -372,12 +390,17 @@ namespace WeldingTrainer.Prototype
                     UpdateBead();
                 }
 
+            }
+
+            if (triggerPressed)
+            {
                 SendWarningHaptic(stateColour);
             }
 
             if (!_completed && _beadProgress >= completionThreshold)
             {
                 _completed = true;
+                _attemptFinishedAt = Time.realtimeSinceStartup;
                 _beadProgress = 1f;
                 UpdateBead();
                 FinishRecording(true, "completed");
@@ -417,10 +440,13 @@ namespace WeldingTrainer.Prototype
                     ? "Results saved locally"
                     : "Result save failed - see Console";
                 return string.Format(
-                    "WELD COMPLETE\nCompletion: 100%\nAverage error: {0:0.0} cm\nAverage speed: {1:0.0} cm/s\nGood samples: {2:0}%\nTracking interruptions: {3} ({4:0.0} s)\n{5}\nPress B or R to reset\nPress A or C to place a new seam",
+                    "WELD COMPLETE\nCompletion: 100%\nAverage error: {0:0.0} cm\nAverage speed: {1:0.0} cm/s\nGood samples: {2:0}%\nTime: {3:0.0} s | Active: {4:0.0} s | Blocked: {5:0.0} s\nTracking interruptions: {6} ({7:0.0} s)\n{8}\nPress B or R to reset\nPress A or C to place a new seam",
                     averageError * 100f,
                     averageSpeed * 100f,
                     quality,
+                    GetAttemptElapsedSeconds(),
+                    _weldingActiveSeconds,
+                    _blockedTriggerSeconds,
                     _trackingInterruptionCount,
                     GetInvalidTrackingSeconds(),
                     saveStatus);
@@ -682,6 +708,10 @@ namespace WeldingTrainer.Prototype
             _beadProgress = 0f;
             _errorSum = 0f;
             _speedSum = 0f;
+            _attemptStartedAt = 0f;
+            _attemptFinishedAt = 0f;
+            _weldingActiveSeconds = 0f;
+            _blockedTriggerSeconds = 0f;
             _sampleCount = 0;
             _goodSampleCount = 0;
             _smoothedSpeed = 0f;
@@ -775,7 +805,10 @@ namespace WeldingTrainer.Prototype
                     averageSpeed,
                     goodPercent,
                     _trackingInterruptionCount,
-                    GetInvalidTrackingSeconds());
+                    GetInvalidTrackingSeconds(),
+                    GetAttemptElapsedSeconds(),
+                    _weldingActiveSeconds,
+                    _blockedTriggerSeconds);
                 _sessionSaved = !string.IsNullOrEmpty(savedDirectory);
             }
             catch (Exception exception)
@@ -863,6 +896,19 @@ namespace WeldingTrainer.Prototype
             return _invalidTrackingSeconds + Mathf.Max(
                 0f,
                 Time.realtimeSinceStartup - _trackingLossStartedAt);
+        }
+
+        private float GetAttemptElapsedSeconds()
+        {
+            if (!_attemptStarted || _attemptStartedAt <= 0f)
+            {
+                return 0f;
+            }
+
+            float finishedAt = _attemptFinishedAt > 0f
+                ? _attemptFinishedAt
+                : Time.realtimeSinceStartup;
+            return Mathf.Max(0f, finishedAt - _attemptStartedAt);
         }
 
         private void CreateAudioFeedback()

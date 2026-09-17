@@ -74,7 +74,10 @@ namespace WeldingTrainer.Prototype
             float averageSpeedMetresPerSecond,
             float goodSamplePercent,
             int trackingInterruptionCount,
-            float invalidTrackingSeconds)
+            float invalidTrackingSeconds,
+            float attemptElapsedSeconds,
+            float weldingActiveSeconds,
+            float blockedTriggerSeconds)
         {
             if (!IsActive)
             {
@@ -88,7 +91,7 @@ namespace WeldingTrainer.Prototype
 
             var summary = new SummaryRecord
             {
-                schemaVersion = 3,
+                schemaVersion = 4,
                 sessionId = _sessionId,
                 startedUtc = _startedUtc,
                 finishedUtc = DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture),
@@ -100,6 +103,9 @@ namespace WeldingTrainer.Prototype
                 goodSamplePercent = goodSamplePercent,
                 trackingInterruptionCount = trackingInterruptionCount,
                 invalidTrackingSeconds = invalidTrackingSeconds,
+                attemptElapsedSeconds = attemptElapsedSeconds,
+                weldingActiveSeconds = weldingActiveSeconds,
+                blockedTriggerSeconds = blockedTriggerSeconds,
                 sampleCount = _samples.Count
             };
 
@@ -163,6 +169,9 @@ namespace WeldingTrainer.Prototype
             public float goodSamplePercent;
             public int trackingInterruptionCount;
             public float invalidTrackingSeconds;
+            public float attemptElapsedSeconds;
+            public float weldingActiveSeconds;
+            public float blockedTriggerSeconds;
             public int sampleCount;
         }
 
