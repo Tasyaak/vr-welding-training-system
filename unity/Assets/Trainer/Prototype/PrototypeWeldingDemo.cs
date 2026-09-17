@@ -54,14 +54,19 @@ namespace WeldingTrainer.Prototype
         private static readonly Color WarningColour = new Color(1f, 0.75f, 0.05f, 1f);
         private static readonly Color BadColour = new Color(1f, 0.12f, 0.08f, 1f);
         private static readonly Color GuideColour = new Color(0.1f, 0.75f, 1f, 1f);
+        private static readonly Color EndColour = new Color(0.35f, 0.55f, 1f, 1f);
 
         private InputDevice _rightController;
         private InputDevice _leftController;
         private Transform _trackingOrigin;
         private Transform _toolTip;
+        private Transform _seamStartMarker;
+        private Transform _seamEndMarker;
         private LineRenderer _guide;
         private LineRenderer _bead;
         private TextMesh _hud;
+        private TextMesh _seamStartLabel;
+        private TextMesh _seamEndLabel;
         private AudioSource _audioSource;
         private AudioClip _weldStartedClip;
         private AudioClip _weldInhibitedClip;
@@ -131,6 +136,7 @@ namespace WeldingTrainer.Prototype
             _recorder = new PrototypeSessionRecorder();
             CreateToolTip();
             CreateGuide();
+            CreateSeamMarkers();
             CreateBead();
             CreateHud();
             CreateAudioFeedback();
@@ -261,6 +267,8 @@ namespace WeldingTrainer.Prototype
             _hud.transform.rotation = Quaternion.LookRotation(
                 _hud.transform.position - cameraTransform.position,
                 cameraTransform.up);
+            FaceTextToCamera(_seamStartLabel, cameraTransform);
+            FaceTextToCamera(_seamEndLabel, cameraTransform);
         }
 
         private void UpdateEvaluation(bool triggerPressed, Quaternion toolRotation)
@@ -467,7 +475,7 @@ namespace WeldingTrainer.Prototype
                 : "Angles: disabled until tool axis is verified";
 
             return string.Format(
-                "{0}\n{1}\n{2}\nError: {3:0.0} cm\nProgress: {4:0}%\n{5}\nPress A or C to place seam",
+                "{0}\n{1}\n{2}\nError: {3:0.0} cm\nProgress: {4:0}%\n{5}\nFollow green START to blue END\nPress A or C to place seam",
                 positionLabel,
                 speedLabel,
                 angleLabel,
@@ -637,6 +645,7 @@ namespace WeldingTrainer.Prototype
             _seamEnd = centre + direction * (defaultSeamLengthMetres * 0.5f);
             _guide.SetPosition(0, _seamStart);
             _guide.SetPosition(1, _seamEnd);
+            UpdateSeamMarkers(_seamStart, _seamEnd);
             _editorToolPosition = _seamStart + cameraTransform.up * 0.01f;
             _smoothedToolPosition = _editorToolPosition;
             _seamPlaced = true;
@@ -687,6 +696,7 @@ namespace WeldingTrainer.Prototype
             _trackingInterruptionCount = 0;
             _guide.SetPosition(0, _seamStart);
             _guide.SetPosition(1, _seamEnd);
+            UpdateSeamMarkers(_seamStart, _seamEnd);
             UpdateBead();
             BeginRecording();
         }
@@ -700,6 +710,7 @@ namespace WeldingTrainer.Prototype
                 _calibrationStart = toolPosition;
                 _guide.SetPosition(0, _calibrationStart);
                 _guide.SetPosition(1, _calibrationStart);
+                UpdateSeamMarkers(_calibrationStart, _calibrationStart, false);
                 _bead.enabled = false;
                 _calibrationMessage =
                     "SEAM PLACEMENT\nStart captured\nMove the tool to the seam end\nand press A or C again";
@@ -725,6 +736,7 @@ namespace WeldingTrainer.Prototype
             _seamEnd = toolPosition;
             _guide.SetPosition(0, _seamStart);
             _guide.SetPosition(1, _seamEnd);
+            UpdateSeamMarkers(_seamStart, _seamEnd);
             _isCalibrating = false;
             ResetAttempt();
         }
@@ -965,6 +977,45 @@ namespace WeldingTrainer.Prototype
             _guide.positionCount = 2;
         }
 
+        private void CreateSeamMarkers()
+        {
+            _seamStartMarker = CreateSeamMarker("Seam Start Marker", GoodColour);
+            _seamEndMarker = CreateSeamMarker("Seam End Marker", EndColour);
+            _seamStartLabel = CreateWorldLabel("Seam Start Label", "START", GoodColour);
+            _seamEndLabel = CreateWorldLabel("Seam End Label", "END", EndColour);
+
+            _seamStartMarker.gameObject.SetActive(false);
+            _seamEndMarker.gameObject.SetActive(false);
+            _seamStartLabel.gameObject.SetActive(false);
+            _seamEndLabel.gameObject.SetActive(false);
+        }
+
+        private Transform CreateSeamMarker(string markerName, Color colour)
+        {
+            GameObject marker = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            marker.name = markerName;
+            marker.transform.SetParent(transform, false);
+            marker.transform.localScale = Vector3.one * 0.032f;
+            Destroy(marker.GetComponent<Collider>());
+            marker.GetComponent<Renderer>().material = CreateMaterial(colour);
+            return marker.transform;
+        }
+
+        private TextMesh CreateWorldLabel(string objectName, string text, Color colour)
+        {
+            GameObject labelObject = new GameObject(objectName);
+            labelObject.transform.SetParent(transform, false);
+            TextMesh label = labelObject.AddComponent<TextMesh>();
+            label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            label.fontSize = 48;
+            label.characterSize = 0.0035f;
+            label.anchor = TextAnchor.MiddleCenter;
+            label.alignment = TextAlignment.Center;
+            label.color = colour;
+            label.text = text;
+            return label;
+        }
+
         private void CreateBead()
         {
             GameObject beadObject = new GameObject("Progressive Weld Bead");
@@ -1030,6 +1081,36 @@ namespace WeldingTrainer.Prototype
 
             _guide.startColor = colour;
             _guide.endColor = colour;
+        }
+
+        private void UpdateSeamMarkers(Vector3 start, Vector3 end, bool showEnd = true)
+        {
+            if (_seamStartMarker == null || _seamEndMarker == null)
+            {
+                return;
+            }
+
+            _seamStartMarker.gameObject.SetActive(true);
+            _seamStartLabel.gameObject.SetActive(true);
+            _seamEndMarker.gameObject.SetActive(showEnd);
+            _seamEndLabel.gameObject.SetActive(showEnd);
+
+            _seamStartMarker.position = start;
+            _seamEndMarker.position = end;
+            _seamStartLabel.transform.position = start + Vector3.up * 0.045f;
+            _seamEndLabel.transform.position = end + Vector3.up * 0.045f;
+        }
+
+        private static void FaceTextToCamera(TextMesh label, Transform cameraTransform)
+        {
+            if (label == null || !label.gameObject.activeInHierarchy)
+            {
+                return;
+            }
+
+            label.transform.rotation = Quaternion.LookRotation(
+                label.transform.position - cameraTransform.position,
+                cameraTransform.up);
         }
 
         private void UpdateBead()
