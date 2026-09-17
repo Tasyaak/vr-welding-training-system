@@ -141,3 +141,6 @@ The complete project-specific Git/GitHub guide is here:
 **[`docs/git-and-github.md`](docs/git-and-github.md)**
 
 It explains commits, branches, `.gitignore`, `.gitattributes`, Issues, Pull Requests, branch synchronization, conflict resolution, GitHub CLI, and the recommended workflow for this project
+
+The staged implementation plan is documented in
+**[`docs/roadmap.md`](docs/roadmap.md)**.
