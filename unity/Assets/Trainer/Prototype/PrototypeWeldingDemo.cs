@@ -82,6 +82,9 @@ namespace WeldingTrainer.Prototype
         private float _nextAudioCueTime;
         private float _recordingStartedAt;
         private float _nextRecordTime;
+        private float _trackingLossStartedAt;
+        private float _invalidTrackingSeconds;
+        private int _trackingInterruptionCount;
         private bool _hasPreviousPosition;
         private bool _seamPlaced;
         private bool _attemptStarted;
@@ -90,6 +93,8 @@ namespace WeldingTrainer.Prototype
         private bool _calibrateWasPressed;
         private bool _sessionSaved;
         private bool _isCalibrating;
+        private bool _trackingInterrupted;
+        private bool _requiresTriggerRelease;
         private Vector3 _calibrationStart;
         private string _calibrationMessage;
         private PrototypeSessionRecorder _recorder;
@@ -203,12 +208,17 @@ namespace WeldingTrainer.Prototype
 
             if (!trackingValid)
             {
+                HandleTrackingLost();
                 _hasPreviousPosition = false;
                 SetToolColour(BadColour);
-                SetHud("Controller tracking unavailable\nMove or wake the right controller");
+                SetHud(
+                    "CONTROLLER TRACKING LOST\nWelding paused\n" +
+                    "Move or wake the right controller\nRelease trigger before resuming");
                 _calibrateWasPressed = calibratePressed;
                 return;
             }
+
+            HandleTrackingRestored(triggerPressed);
 
             float positionBlend = 1f - Mathf.Exp(-PositionSmoothing * Time.unscaledDeltaTime);
             _smoothedToolPosition = _hasPreviousPosition
@@ -297,6 +307,7 @@ namespace WeldingTrainer.Prototype
                 progress >= _beadProgress - reverseProgressTolerance;
             bool activationAllowed =
                 _attemptStarted &&
+                !_requiresTriggerRelease &&
                 positionWeldable &&
                 progressContinuous &&
                 (!evaluateOrientation || !orientationInhibitsWelding || orientationGood) &&
@@ -398,10 +409,12 @@ namespace WeldingTrainer.Prototype
                     ? "Results saved locally"
                     : "Result save failed - see Console";
                 return string.Format(
-                    "WELD COMPLETE\nCompletion: 100%\nAverage error: {0:0.0} cm\nAverage speed: {1:0.0} cm/s\nGood samples: {2:0}%\n{3}\nPress B or R to reset\nPress A or C to place a new seam",
+                    "WELD COMPLETE\nCompletion: 100%\nAverage error: {0:0.0} cm\nAverage speed: {1:0.0} cm/s\nGood samples: {2:0}%\nTracking interruptions: {3} ({4:0.0} s)\n{5}\nPress B or R to reset\nPress A or C to place a new seam",
                     averageError * 100f,
                     averageSpeed * 100f,
                     quality,
+                    _trackingInterruptionCount,
+                    GetInvalidTrackingSeconds(),
                     saveStatus);
             }
 
@@ -421,6 +434,10 @@ namespace WeldingTrainer.Prototype
                 activationLabel = nearStart
                     ? "At seam start - hold trigger to begin"
                     : "Move to the seam start";
+            }
+            else if (_requiresTriggerRelease)
+            {
+                activationLabel = "Laser simulation: INHIBITED - release trigger to re-arm";
             }
             else if (!positionWeldable)
             {
@@ -663,6 +680,11 @@ namespace WeldingTrainer.Prototype
             _completed = false;
             _sessionSaved = false;
             _feedbackAudioState = FeedbackAudioState.Idle;
+            _trackingInterrupted = false;
+            _requiresTriggerRelease = false;
+            _trackingLossStartedAt = 0f;
+            _invalidTrackingSeconds = 0f;
+            _trackingInterruptionCount = 0;
             _guide.SetPosition(0, _seamStart);
             _guide.SetPosition(1, _seamEnd);
             UpdateBead();
@@ -739,7 +761,9 @@ namespace WeldingTrainer.Prototype
                     _beadProgress,
                     averageError,
                     averageSpeed,
-                    goodPercent);
+                    goodPercent,
+                    _trackingInterruptionCount,
+                    GetInvalidTrackingSeconds());
                 _sessionSaved = !string.IsNullOrEmpty(savedDirectory);
             }
             catch (Exception exception)
@@ -753,6 +777,10 @@ namespace WeldingTrainer.Prototype
         {
             if (paused)
             {
+                if (_attemptStarted && !_completed)
+                {
+                    _requiresTriggerRelease = true;
+                }
                 FinishRecording(false, "application_paused");
             }
             else if (_seamPlaced && !_completed && _recorder != null && !_recorder.IsActive)
@@ -781,6 +809,48 @@ namespace WeldingTrainer.Prototype
 
             _rightController.SendHapticImpulse(0u, amplitude, 0.04f);
             _nextHapticTime = Time.unscaledTime + 0.12f;
+        }
+
+        private void HandleTrackingLost()
+        {
+            if (!_attemptStarted || _completed || _trackingInterrupted)
+            {
+                return;
+            }
+
+            _trackingInterrupted = true;
+            _requiresTriggerRelease = true;
+            _trackingLossStartedAt = Time.realtimeSinceStartup;
+            _trackingInterruptionCount++;
+        }
+
+        private void HandleTrackingRestored(bool triggerPressed)
+        {
+            if (_trackingInterrupted)
+            {
+                _invalidTrackingSeconds += Mathf.Max(
+                    0f,
+                    Time.realtimeSinceStartup - _trackingLossStartedAt);
+                _trackingInterrupted = false;
+                _trackingLossStartedAt = 0f;
+            }
+
+            if (_requiresTriggerRelease && !triggerPressed)
+            {
+                _requiresTriggerRelease = false;
+            }
+        }
+
+        private float GetInvalidTrackingSeconds()
+        {
+            if (!_trackingInterrupted)
+            {
+                return _invalidTrackingSeconds;
+            }
+
+            return _invalidTrackingSeconds + Mathf.Max(
+                0f,
+                Time.realtimeSinceStartup - _trackingLossStartedAt);
         }
 
         private void CreateAudioFeedback()

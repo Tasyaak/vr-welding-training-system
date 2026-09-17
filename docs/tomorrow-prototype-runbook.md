@@ -20,6 +20,10 @@ Hall sensing, production-grade storage, or validated welding tolerances.
 - Controller haptics warn about marginal or invalid movement.
 - Short generated audio cues announce welding start, inhibition, and completion;
   no external sound assets are required.
+- Losing controller tracking immediately pauses welding. After tracking returns,
+  the trigger must be released before the simulation can activate again.
+- Returning from a headset/application pause uses the same trigger-release
+  re-arm rule.
 - Completion, mean error, mean speed, and percentage of good samples are shown.
 - Each completed, reset, paused, or interrupted attempt is saved locally as a
   JSON summary and CSV sample stream.
@@ -105,12 +109,16 @@ as the emergency presentation fallback; do not present it as device tracking.
 8. As a negative test, release the trigger, jump well ahead of the bead edge,
    and hold it again. Activation must remain inhibited until returning to the
    current bead edge.
+9. While welding, deliberately hide or sleep the controller. Confirm welding
+   pauses and does not resume after tracking returns until the trigger is
+   released once.
 
 Session files are written below `Application.persistentDataPath` in
 `PrototypeSessions/<session-id>/`. Each directory contains `summary.json` and
 `samples.csv`. Samples include measured travel/work angles and their configured
 quality state even when angle-based inhibition is disabled. The Unity Console
-prints the exact path after saving. On Quest,
+prints the exact path after saving. The summary also records tracking
+interruption count and total invalid-tracking time. On Quest,
 retrieve the application files later through USB/ADB; data export is not needed
 for the live demonstration.
 
