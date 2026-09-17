@@ -460,9 +460,11 @@ namespace WeldingTrainer.Prototype
             if (_completed)
             {
                 GetQualityMetrics(out float averageError, out float averageSpeed, out float quality);
-                string saveStatus = _sessionSaved
-                    ? "Results saved locally"
-                    : "Result save failed - see Console";
+                string saveStatus = !_sessionSaved
+                    ? "Result save failed - see Console"
+                    : _recorder != null && _recorder.LastRecordingTruncated
+                        ? "Results saved - WARNING: recording sample limit reached"
+                        : "Results saved locally";
                 return string.Format(
                     "WELD COMPLETE\nCompletion: 100%\nAverage error: {0:0.0} cm\nAverage speed: {1:0.0} cm/s\nQuality in range: {2:0}%\nTime: {3:0.0} s | Active: {4:0.0} s | Blocked: {5:0.0} s\nTracking interruptions: {6} ({7:0.0} s)\n{8}\nPress B or R to reset\nPress A or C to place a new seam",
                     averageError * 100f,
