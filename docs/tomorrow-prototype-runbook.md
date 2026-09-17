@@ -7,6 +7,8 @@ Hall sensing, production-grade storage, or validated welding tolerances.
 ## Demonstrated behavior
 
 - One 50 cm straight seam appears in front of the user.
+- Green **START** and blue **END** markers make the required travel direction
+  unambiguous.
 - For the live demonstration, the seam can be aligned with two controller
   points: press A at its start and press A again at its end. This is a temporary
   demo placement mode, not the final QR registration workflow.
@@ -104,6 +106,7 @@ as the emergency presentation fallback; do not present it as device tracking.
 5. Put the right controller at the physical seam start and press A. Move it to
    the seam end and press A again. The two points must be 15 cm to 1.5 m apart.
 6. Return to the start, hold the trigger, and follow the displayed seam.
+   Travel from the green **START** marker toward the blue **END** marker.
 7. Verify position/speed feedback, audio cues, haptics, bead progress,
    completion, and reset.
 8. As a negative test, release the trigger, jump well ahead of the bead edge,
