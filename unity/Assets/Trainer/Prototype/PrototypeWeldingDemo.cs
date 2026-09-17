@@ -49,6 +49,8 @@ namespace WeldingTrainer.Prototype
         [Header("Presentation feedback")]
         [SerializeField] private bool enableAudioFeedback = true;
         [SerializeField, Range(0f, 1f)] private float audioFeedbackVolume = 0.25f;
+        [SerializeField] private bool showHudBackground = true;
+        [SerializeField] private Vector2 hudBackgroundSize = new Vector2(0.68f, 0.42f);
 
         private static readonly Color GoodColour = new Color(0.1f, 1f, 0.25f, 1f);
         private static readonly Color WarningColour = new Color(1f, 0.75f, 0.05f, 1f);
@@ -62,6 +64,7 @@ namespace WeldingTrainer.Prototype
         private Transform _toolTip;
         private Transform _seamStartMarker;
         private Transform _seamEndMarker;
+        private Transform _hudBackground;
         private LineRenderer _guide;
         private LineRenderer _bead;
         private TextMesh _hud;
@@ -163,6 +166,8 @@ namespace WeldingTrainer.Prototype
             maximumWeldDistanceMetres = Mathf.Max(goodDistanceMetres, maximumWeldDistanceMetres);
             minimumGoodSpeed = Mathf.Max(0f, minimumGoodSpeed);
             maximumGoodSpeed = Mathf.Max(minimumGoodSpeed, maximumGoodSpeed);
+            hudBackgroundSize.x = Mathf.Max(0.25f, hudBackgroundSize.x);
+            hudBackgroundSize.y = Mathf.Max(0.18f, hudBackgroundSize.y);
             if (localToolForwardAxis.sqrMagnitude < 0.0001f)
             {
                 localToolForwardAxis = Vector3.forward;
@@ -271,6 +276,17 @@ namespace WeldingTrainer.Prototype
             _hud.transform.rotation = Quaternion.LookRotation(
                 _hud.transform.position - cameraTransform.position,
                 cameraTransform.up);
+            if (_hudBackground != null)
+            {
+                _hudBackground.gameObject.SetActive(showHudBackground);
+                _hudBackground.position =
+                    _hud.transform.position + cameraTransform.forward * 0.015f;
+                _hudBackground.rotation = _hud.transform.rotation;
+                _hudBackground.localScale = new Vector3(
+                    hudBackgroundSize.x,
+                    hudBackgroundSize.y,
+                    0.004f);
+            }
             FaceTextToCamera(_seamStartLabel, cameraTransform);
             FaceTextToCamera(_seamEndLabel, cameraTransform);
         }
@@ -1074,6 +1090,15 @@ namespace WeldingTrainer.Prototype
 
         private void CreateHud()
         {
+            GameObject background = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            background.name = "Prototype HUD Background";
+            background.transform.SetParent(transform, false);
+            Destroy(background.GetComponent<Collider>());
+            background.GetComponent<Renderer>().material = CreateMaterial(
+                new Color(0.015f, 0.02f, 0.03f, 1f));
+            _hudBackground = background.transform;
+            _hudBackground.gameObject.SetActive(showHudBackground);
+
             GameObject hudObject = new GameObject("Prototype HUD");
             hudObject.transform.SetParent(transform, false);
             _hud = hudObject.AddComponent<TextMesh>();

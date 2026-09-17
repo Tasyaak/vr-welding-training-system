@@ -22,6 +22,8 @@ Hall sensing, production-grade storage, or validated welding tolerances.
 - Controller haptics warn about marginal or invalid movement.
 - Short generated audio cues announce welding start, inhibition, and completion;
   no external sound assets are required.
+- A dark-backed, head-relative HUD keeps instructions and results readable over
+  bright or visually busy passthrough scenes.
 - Losing controller tracking immediately pauses welding. After tracking returns,
   the trigger must be released before the simulation can activate again.
 - Returning from a headset/application pause uses the same trigger-release
@@ -51,6 +53,10 @@ until the physical axis and angle convention have been checked on-device.
 Audio feedback is enabled by default at a conservative volume. It can be
 disabled or adjusted on a scene instance of `PrototypeWeldingDemo` if the
 presentation room or headset audio setup makes the cues distracting.
+
+The HUD background is enabled by default. Its visibility and size can be
+adjusted under **Presentation Feedback** on a scene instance. Keep enough of the
+real workpiece visible around the panel when checking the layout on Quest.
 
 ## Required Unity setup
 
@@ -103,7 +109,8 @@ as the emergency presentation fallback; do not present it as device tracking.
    the headset.
 2. Confirm the headset is visible as the Android run device.
 3. Build and Run the Bootstrap scene.
-4. Confirm passthrough is visible and the HUD is readable.
+4. Confirm passthrough is visible, the HUD text is readable against its dark
+   panel, and the panel does not cover the working area.
 5. Put the right controller at the physical seam start and press A. Move it to
    the seam end and press A again. The two points must be 15 cm to 1.5 m apart.
 6. Return to the start, hold the trigger, and follow the displayed seam.
