@@ -7,6 +7,9 @@ Hall sensing, persistent logs, or validated welding tolerances.
 ## Demonstrated behavior
 
 - One 50 cm straight seam appears in front of the user.
+- For the live demonstration, the seam can be aligned with two controller
+  points: press A at its start and press A again at its end. This is a temporary
+  demo placement mode, not the final QR registration workflow.
 - The right Touch Plus controller drives a virtual welding tip.
 - Position and movement speed are classified as good, warning, or bad.
 - Holding the right trigger produces a progressive virtual bead while the tip
@@ -52,6 +55,7 @@ Press Play. The prototype starts automatically.
 | `U` / `O` | Move away/toward the camera |
 | Left Shift | Move faster |
 | Space | Hold simulated trigger |
+| `C` | Capture the start/end point for demo seam placement |
 | `R` | Reset attempt |
 
 Expected result: the sphere follows the simulated tool, feedback changes
@@ -65,8 +69,10 @@ shows the result summary.
 2. Confirm the headset is visible as the Android run device.
 3. Build and Run the Bootstrap scene.
 4. Confirm passthrough is visible and the HUD is readable.
-5. Move the right controller near the seam and hold its trigger.
-6. Verify position/speed feedback, haptics, bead progress, completion, and reset.
+5. Put the right controller at the physical seam start and press A. Move it to
+   the seam end and press A again. The two points must be 15 cm to 1.5 m apart.
+6. Return to the start, hold the trigger, and follow the displayed seam.
+7. Verify position/speed feedback, haptics, bead progress, completion, and reset.
 
 Session files are written below `Application.persistentDataPath` in
 `PrototypeSessions/<session-id>/`. Each directory contains `summary.json` and
