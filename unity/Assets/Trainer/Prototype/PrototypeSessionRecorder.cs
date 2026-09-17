@@ -38,6 +38,9 @@ namespace WeldingTrainer.Prototype
             float seamProgress,
             float distanceMetres,
             float speedMetresPerSecond,
+            float travelAngleDegrees,
+            float workAngleDegrees,
+            bool orientationGood,
             bool triggerPressed,
             bool weldingAllowed)
         {
@@ -55,6 +58,9 @@ namespace WeldingTrainer.Prototype
                 seamProgress = seamProgress,
                 distanceMetres = distanceMetres,
                 speedMetresPerSecond = speedMetresPerSecond,
+                travelAngleDegrees = travelAngleDegrees,
+                workAngleDegrees = workAngleDegrees,
+                orientationGood = orientationGood,
                 triggerPressed = triggerPressed,
                 weldingAllowed = weldingAllowed
             });
@@ -80,7 +86,7 @@ namespace WeldingTrainer.Prototype
 
             var summary = new SummaryRecord
             {
-                schemaVersion = 1,
+                schemaVersion = 2,
                 sessionId = _sessionId,
                 startedUtc = _startedUtc,
                 finishedUtc = DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture),
@@ -108,7 +114,7 @@ namespace WeldingTrainer.Prototype
         {
             using var writer = new StreamWriter(path, false, new UTF8Encoding(false));
             writer.WriteLine(
-                "elapsed_s,tool_x_m,tool_y_m,tool_z_m,seam_progress,distance_m,speed_mps,trigger,welding_allowed");
+                "elapsed_s,tool_x_m,tool_y_m,tool_z_m,seam_progress,distance_m,speed_mps,travel_angle_deg,work_angle_deg,orientation_good,trigger,welding_allowed");
 
             foreach (SampleRecord sample in _samples)
             {
@@ -125,6 +131,12 @@ namespace WeldingTrainer.Prototype
                 writer.Write(sample.distanceMetres.ToString("0.000000", CultureInfo.InvariantCulture));
                 writer.Write(',');
                 writer.Write(sample.speedMetresPerSecond.ToString("0.000000", CultureInfo.InvariantCulture));
+                writer.Write(',');
+                writer.Write(sample.travelAngleDegrees.ToString("0.000", CultureInfo.InvariantCulture));
+                writer.Write(',');
+                writer.Write(sample.workAngleDegrees.ToString("0.000", CultureInfo.InvariantCulture));
+                writer.Write(',');
+                writer.Write(sample.orientationGood ? "1" : "0");
                 writer.Write(',');
                 writer.Write(sample.triggerPressed ? "1" : "0");
                 writer.Write(',');
@@ -157,6 +169,9 @@ namespace WeldingTrainer.Prototype
             public float seamProgress;
             public float distanceMetres;
             public float speedMetresPerSecond;
+            public float travelAngleDegrees;
+            public float workAngleDegrees;
+            public bool orientationGood;
             public bool triggerPressed;
             public bool weldingAllowed;
         }
