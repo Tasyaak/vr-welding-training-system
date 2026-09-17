@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 
-SUPPORTED_SCHEMA_VERSIONS = {2, 3, 4}
+SUPPORTED_SCHEMA_VERSIONS = {2, 3, 4, 5}
 REQUIRED_SUMMARY_FIELDS = (
     "schemaVersion",
     "sessionId",
@@ -20,7 +20,6 @@ REQUIRED_SUMMARY_FIELDS = (
     "completion",
     "averageErrorMetres",
     "averageSpeedMetresPerSecond",
-    "goodSamplePercent",
     "sampleCount",
 )
 REQUIRED_SAMPLE_COLUMNS = (
@@ -97,6 +96,13 @@ def validate_session(session_path: Path) -> tuple[dict[str, Any], list[str], lis
         ):
             if field not in summary:
                 errors.append(f"schema {schema_version} summary is missing {field}")
+    quality_field = (
+        "qualityInRangePercent"
+        if isinstance(schema_version, int) and schema_version >= 5
+        else "goodSamplePercent"
+    )
+    if quality_field not in summary:
+        errors.append(f"schema {schema_version} summary is missing {quality_field}")
 
     completion = finite_number(summary.get("completion"), "completion", errors)
     average_error = finite_number(
@@ -107,8 +113,8 @@ def validate_session(session_path: Path) -> tuple[dict[str, Any], list[str], lis
         "averageSpeedMetresPerSecond",
         errors,
     )
-    good_percent = finite_number(
-        summary.get("goodSamplePercent"), "goodSamplePercent", errors
+    quality_percent = finite_number(
+        summary.get(quality_field), quality_field, errors
     )
     optional_numbers: dict[str, float | None] = {}
     for field in (
@@ -131,8 +137,8 @@ def validate_session(session_path: Path) -> tuple[dict[str, Any], list[str], lis
 
     if completion is not None and not 0 <= completion <= 1:
         errors.append(f"completion is outside 0..1: {completion}")
-    if good_percent is not None and not 0 <= good_percent <= 100:
-        errors.append(f"goodSamplePercent is outside 0..100: {good_percent}")
+    if quality_percent is not None and not 0 <= quality_percent <= 100:
+        errors.append(f"{quality_field} is outside 0..100: {quality_percent}")
     if average_error is not None and average_error < 0:
         errors.append("averageErrorMetres cannot be negative")
     if average_speed is not None and average_speed < 0:
@@ -222,7 +228,7 @@ def validate_session(session_path: Path) -> tuple[dict[str, Any], list[str], lis
         "averageSpeedCentimetresPerSecond": (
             average_speed * 100 if average_speed is not None else None
         ),
-        "goodSamplePercent": good_percent,
+        "qualityInRangePercent": quality_percent,
         "sampleCount": row_count,
         "attemptElapsedSeconds": optional_numbers["attemptElapsedSeconds"],
         "weldingActiveSeconds": optional_numbers["weldingActiveSeconds"],
@@ -260,7 +266,10 @@ def print_human_report(
             "Average speed: "
             f"{format_optional(report.get('averageSpeedCentimetresPerSecond'), ' cm/s')}"
         )
-        print(f"Good samples: {format_optional(report.get('goodSamplePercent'), '%')}")
+        print(
+            "Quality in range: "
+            f"{format_optional(report.get('qualityInRangePercent'), '%')}"
+        )
         print(f"Samples: {report.get('sampleCount')}")
         print(
             "Timing: "

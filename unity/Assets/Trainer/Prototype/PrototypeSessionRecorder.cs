@@ -72,7 +72,7 @@ namespace WeldingTrainer.Prototype
             float completion,
             float averageErrorMetres,
             float averageSpeedMetresPerSecond,
-            float goodSamplePercent,
+            float qualityInRangePercent,
             int trackingInterruptionCount,
             float invalidTrackingSeconds,
             float attemptElapsedSeconds,
@@ -91,7 +91,7 @@ namespace WeldingTrainer.Prototype
 
             var summary = new SummaryRecord
             {
-                schemaVersion = 4,
+                schemaVersion = 5,
                 sessionId = _sessionId,
                 startedUtc = _startedUtc,
                 finishedUtc = DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture),
@@ -100,7 +100,7 @@ namespace WeldingTrainer.Prototype
                 completion = completion,
                 averageErrorMetres = averageErrorMetres,
                 averageSpeedMetresPerSecond = averageSpeedMetresPerSecond,
-                goodSamplePercent = goodSamplePercent,
+                qualityInRangePercent = qualityInRangePercent,
                 trackingInterruptionCount = trackingInterruptionCount,
                 invalidTrackingSeconds = invalidTrackingSeconds,
                 attemptElapsedSeconds = attemptElapsedSeconds,
@@ -166,7 +166,7 @@ namespace WeldingTrainer.Prototype
             public float completion;
             public float averageErrorMetres;
             public float averageSpeedMetresPerSecond;
-            public float goodSamplePercent;
+            public float qualityInRangePercent;
             public int trackingInterruptionCount;
             public float invalidTrackingSeconds;
             public float attemptElapsedSeconds;

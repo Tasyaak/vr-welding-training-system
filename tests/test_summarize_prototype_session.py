@@ -23,9 +23,11 @@ CSV_ROWS = (
 )
 
 
-def write_session(directory: Path, sample_count: int = 2) -> None:
+def write_session(
+    directory: Path, sample_count: int = 2, schema_version: int = 5
+) -> None:
     summary = {
-        "schemaVersion": 4,
+        "schemaVersion": schema_version,
         "sessionId": "test-session",
         "startedUtc": "2026-09-17T10:00:00Z",
         "finishedUtc": "2026-09-17T10:00:02Z",
@@ -34,7 +36,6 @@ def write_session(directory: Path, sample_count: int = 2) -> None:
         "completion": 1.0,
         "averageErrorMetres": 0.011,
         "averageSpeedMetresPerSecond": 0.055,
-        "goodSamplePercent": 100.0,
         "trackingInterruptionCount": 0,
         "invalidTrackingSeconds": 0.0,
         "attemptElapsedSeconds": 2.0,
@@ -42,6 +43,8 @@ def write_session(directory: Path, sample_count: int = 2) -> None:
         "blockedTriggerSeconds": 0.1,
         "sampleCount": sample_count,
     }
+    quality_field = "qualityInRangePercent" if schema_version >= 5 else "goodSamplePercent"
+    summary[quality_field] = 100.0
     (directory / "summary.json").write_text(json.dumps(summary), encoding="utf-8")
     (directory / "samples.csv").write_text(CSV_HEADER + CSV_ROWS, encoding="utf-8")
 
@@ -65,7 +68,17 @@ class SessionValidatorTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("Validation: PASSED", result.stdout)
         self.assertIn("Average error: 1.1 cm", result.stdout)
+        self.assertIn("Quality in range: 100.0%", result.stdout)
         self.assertIn("Timing: attempt 2.0 s", result.stdout)
+
+    def test_legacy_schema_four_quality_field_is_supported(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            session = Path(temporary_directory)
+            write_session(session, schema_version=4)
+            result = self.run_validator(session)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Quality in range: 100.0%", result.stdout)
 
     def test_sample_count_mismatch_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
