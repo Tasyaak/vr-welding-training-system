@@ -1,0 +1,2 @@
+/home/sa/IW_project/vr-welding-training-system/unity/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/src/main/cpp/CMakeLists.txt
+/home/sa/IW_project/vr-welding-training-system/unity/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/src/main/cpp/GameActivity/CMakeLists.txt

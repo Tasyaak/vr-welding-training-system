@@ -1,0 +1,10 @@
+# ninja log v5
+106	8945	8113453921547437	GameActivity/CMakeFiles/game.dir/UGAInputKeyEvent.cpp.o	6d0f48324a546a4f
+20	9059	8113453923406422	GameActivity/CMakeFiles/game.dir/UGAConfiguration.cpp.o	8882821a3d2fbddb
+60	9097	8113453923350766	GameActivity/CMakeFiles/game.dir/UGAEntry.cpp.o	f78017b2176711fe
+130	9170	8113453924184699	GameActivity/CMakeFiles/game.dir/UGAInputMotionEvent.cpp.o	bb9e5b7940b8f18e
+38	9343	8113453925853887	GameActivity/CMakeFiles/game.dir/UGADebug.cpp.o	7ef952c5cdc6d582
+156	10283	8113453934813357	GameActivity/CMakeFiles/game.dir/UGASoftKeyboard.cpp.o	ec388a8f4a7862cb
+1	10611	8113453938910156	GameActivity/CMakeFiles/game.dir/UGAApplication.cpp.o	24a443285d1947bd
+84	10656	8113453939277256	GameActivity/CMakeFiles/game.dir/UGAInput.cpp.o	f8cde788e9737a41
+10658	11010	8113453943021147	C:/Users/olegk/vr-welding-training-system/unity/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/build/intermediates/cxx/RelWithDebInfo/5o4f224r/obj/arm64-v8a/libgame.so	b1f3611de220189
