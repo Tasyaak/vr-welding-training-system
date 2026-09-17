@@ -37,6 +37,15 @@ namespace WeldingTrainer.Prototype
         [SerializeField, Range(0.01f, 0.25f)] private float maximumProgressJump = 0.08f;
         [SerializeField, Range(0f, 0.25f)] private float reverseProgressTolerance = 0.03f;
 
+        [Header("Optional angle feedback")]
+        [SerializeField] private bool evaluateOrientation;
+        [SerializeField] private bool orientationInhibitsWelding;
+        [SerializeField] private Vector3 localToolForwardAxis = Vector3.forward;
+        [SerializeField, Range(0f, 180f)] private float targetTravelAngleDegrees;
+        [SerializeField, Range(0f, 90f)] private float travelAngleToleranceDegrees = 15f;
+        [SerializeField, Range(0f, 180f)] private float targetWorkAngleDegrees = 45f;
+        [SerializeField, Range(0f, 90f)] private float workAngleToleranceDegrees = 15f;
+
         private static readonly Color GoodColour = new Color(0.1f, 1f, 0.25f, 1f);
         private static readonly Color WarningColour = new Color(1f, 0.75f, 0.05f, 1f);
         private static readonly Color BadColour = new Color(1f, 0.12f, 0.08f, 1f);
@@ -120,6 +129,11 @@ namespace WeldingTrainer.Prototype
             maximumWeldDistanceMetres = Mathf.Max(goodDistanceMetres, maximumWeldDistanceMetres);
             minimumGoodSpeed = Mathf.Max(0f, minimumGoodSpeed);
             maximumGoodSpeed = Mathf.Max(minimumGoodSpeed, maximumGoodSpeed);
+            if (localToolForwardAxis.sqrMagnitude < 0.0001f)
+            {
+                localToolForwardAxis = Vector3.forward;
+            }
+            localToolForwardAxis.Normalize();
         }
 
         private void Update()
@@ -199,7 +213,7 @@ namespace WeldingTrainer.Prototype
                 return;
             }
 
-            UpdateEvaluation(triggerPressed);
+            UpdateEvaluation(triggerPressed, rawToolRotation);
         }
 
         private void LateUpdate()
@@ -220,7 +234,7 @@ namespace WeldingTrainer.Prototype
                 cameraTransform.up);
         }
 
-        private void UpdateEvaluation(bool triggerPressed)
+        private void UpdateEvaluation(bool triggerPressed, Quaternion toolRotation)
         {
             Vector3 seam = _seamEnd - _seamStart;
             float seamLengthSquared = seam.sqrMagnitude;
@@ -246,6 +260,13 @@ namespace WeldingTrainer.Prototype
             bool positionWeldable = distance <= maximumWeldDistanceMetres;
             bool speedGood = _smoothedSpeed >= minimumGoodSpeed && _smoothedSpeed <= maximumGoodSpeed;
             bool nearStart = progress <= startProgressThreshold;
+            Vector3 toolForward = toolRotation * localToolForwardAxis;
+            float travelAngle = Vector3.Angle(toolForward, seam.normalized);
+            float workAngle = Vector3.Angle(toolForward, Vector3.up);
+            bool orientationGood =
+                !evaluateOrientation ||
+                (Mathf.Abs(travelAngle - targetTravelAngleDegrees) <= travelAngleToleranceDegrees &&
+                 Mathf.Abs(workAngle - targetWorkAngleDegrees) <= workAngleToleranceDegrees);
 
             if (!_attemptStarted && triggerPressed && positionWeldable && nearStart)
             {
@@ -259,6 +280,7 @@ namespace WeldingTrainer.Prototype
                 _attemptStarted &&
                 positionWeldable &&
                 progressContinuous &&
+                (!evaluateOrientation || !orientationInhibitsWelding || orientationGood) &&
                 !_completed;
             bool welding = triggerPressed && activationAllowed;
 
@@ -272,6 +294,9 @@ namespace WeldingTrainer.Prototype
                     progress,
                     distance,
                     _smoothedSpeed,
+                    travelAngle,
+                    workAngle,
+                    orientationGood,
                     triggerPressed,
                     activationAllowed);
                 _nextRecordTime = Time.realtimeSinceStartup + 0.1f;
@@ -282,7 +307,7 @@ namespace WeldingTrainer.Prototype
             {
                 stateColour = BadColour;
             }
-            else if (positionGood && speedGood)
+            else if (positionGood && speedGood && orientationGood)
             {
                 stateColour = GoodColour;
             }
@@ -298,7 +323,7 @@ namespace WeldingTrainer.Prototype
                 _sampleCount++;
                 _errorSum += distance;
                 _speedSum += _smoothedSpeed;
-                if (positionGood && speedGood)
+                if (positionGood && speedGood && orientationGood)
                 {
                     _goodSampleCount++;
                 }
@@ -326,7 +351,10 @@ namespace WeldingTrainer.Prototype
                 triggerPressed,
                 positionWeldable,
                 nearStart,
-                progressContinuous));
+                progressContinuous,
+                travelAngle,
+                workAngle,
+                orientationGood));
         }
 
         private string BuildStatusText(
@@ -335,7 +363,10 @@ namespace WeldingTrainer.Prototype
             bool triggerPressed,
             bool positionWeldable,
             bool nearStart,
-            bool progressContinuous)
+            bool progressContinuous,
+            float travelAngle,
+            float workAngle,
+            bool orientationGood)
         {
             if (_completed)
             {
@@ -378,6 +409,10 @@ namespace WeldingTrainer.Prototype
             {
                 activationLabel = "Laser simulation: INHIBITED - return to bead edge";
             }
+            else if (evaluateOrientation && orientationInhibitsWelding && !orientationGood)
+            {
+                activationLabel = "Laser simulation: INHIBITED - tool angle";
+            }
             else
             {
                 activationLabel = triggerPressed
@@ -385,10 +420,19 @@ namespace WeldingTrainer.Prototype
                     : "Hold trigger to weld";
             }
 
+            string angleLabel = evaluateOrientation
+                ? string.Format(
+                    "Angles: travel {0:0} deg, work {1:0} deg - {2}",
+                    travelAngle,
+                    workAngle,
+                    orientationGood ? "GOOD" : "ADJUST")
+                : "Angles: disabled until tool axis is verified";
+
             return string.Format(
-                "{0}\n{1}\nError: {2:0.0} cm\nProgress: {3:0}%\n{4}\nPress A or C to place seam",
+                "{0}\n{1}\n{2}\nError: {3:0.0} cm\nProgress: {4:0}%\n{5}\nPress A or C to place seam",
                 positionLabel,
                 speedLabel,
+                angleLabel,
                 distance * 100f,
                 Mathf.Max(progress, _beadProgress) * 100f,
                 activationLabel);

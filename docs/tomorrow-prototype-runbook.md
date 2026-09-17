@@ -33,6 +33,12 @@ The same Inspector also exposes demo distance, speed, start, continuity, and
 completion thresholds. These values are demonstration configuration, not
 validated laser-welding requirements.
 
+Optional travel/work-angle feedback is disabled by default. Enable it only
+after verifying which local controller/attachment axis points toward the tool
+tip. Configure that axis, the target angles, and tolerances in the same
+Inspector. Keep **Orientation Inhibits Welding** disabled for the presentation
+until the physical axis and angle convention have been checked on-device.
+
 ## Required Unity setup
 
 Use Unity `6000.3.24f1` and open the repository's `unity` directory.
@@ -95,7 +101,9 @@ as the emergency presentation fallback; do not present it as device tracking.
 
 Session files are written below `Application.persistentDataPath` in
 `PrototypeSessions/<session-id>/`. Each directory contains `summary.json` and
-`samples.csv`. The Unity Console prints the exact path after saving. On Quest,
+`samples.csv`. Samples include measured travel/work angles and their configured
+quality state even when angle-based inhibition is disabled. The Unity Console
+prints the exact path after saving. On Quest,
 retrieve the application files later through USB/ADB; data export is not needed
 for the live demonstration.
 
