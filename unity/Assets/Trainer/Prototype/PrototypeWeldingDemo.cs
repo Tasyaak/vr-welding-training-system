@@ -801,10 +801,39 @@ namespace WeldingTrainer.Prototype
                 return;
             }
 
-            _recorder.Begin();
+            _recorder.Begin(CreateConfigurationSnapshot());
             _sessionSaved = false;
             _recordingStartedAt = Time.realtimeSinceStartup;
             _nextRecordTime = _recordingStartedAt;
+        }
+
+        private PrototypeSessionRecorder.ConfigurationSnapshot CreateConfigurationSnapshot()
+        {
+            return new PrototypeSessionRecorder.ConfigurationSnapshot
+            {
+                evaluatorVersion = "prototype-straight-seam-v1",
+                applicationVersion = Application.version,
+                unityVersion = Application.unityVersion,
+                runtimePlatform = Application.platform.ToString(),
+                seamStartWorldMetres = _seamStart,
+                seamEndWorldMetres = _seamEnd,
+                controllerToTipOffsetMetres = controllerToTipOffset,
+                goodDistanceMetres = goodDistanceMetres,
+                maximumWeldDistanceMetres = maximumWeldDistanceMetres,
+                minimumGoodSpeedMetresPerSecond = minimumGoodSpeed,
+                maximumGoodSpeedMetresPerSecond = maximumGoodSpeed,
+                completionThreshold = completionThreshold,
+                startProgressThreshold = startProgressThreshold,
+                maximumProgressJump = maximumProgressJump,
+                reverseProgressTolerance = reverseProgressTolerance,
+                evaluateOrientation = evaluateOrientation,
+                orientationInhibitsWelding = orientationInhibitsWelding,
+                localToolForwardAxis = localToolForwardAxis,
+                targetTravelAngleDegrees = targetTravelAngleDegrees,
+                travelAngleToleranceDegrees = travelAngleToleranceDegrees,
+                targetWorkAngleDegrees = targetWorkAngleDegrees,
+                workAngleToleranceDegrees = workAngleToleranceDegrees
+            };
         }
 
         private void FinishRecording(bool completed, string reason)

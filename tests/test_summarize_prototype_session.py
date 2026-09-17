@@ -24,7 +24,7 @@ CSV_ROWS = (
 
 
 def write_session(
-    directory: Path, sample_count: int = 2, schema_version: int = 5
+    directory: Path, sample_count: int = 2, schema_version: int = 6
 ) -> None:
     summary = {
         "schemaVersion": schema_version,
@@ -45,6 +45,31 @@ def write_session(
     }
     quality_field = "qualityInRangePercent" if schema_version >= 5 else "goodSamplePercent"
     summary[quality_field] = 100.0
+    if schema_version >= 6:
+        summary["configuration"] = {
+            "evaluatorVersion": "prototype-straight-seam-v1",
+            "applicationVersion": "0.1.0",
+            "unityVersion": "6000.3.24f1",
+            "runtimePlatform": "WindowsEditor",
+            "seamStartWorldMetres": {"x": 0.0, "y": 0.0, "z": 0.0},
+            "seamEndWorldMetres": {"x": 0.5, "y": 0.0, "z": 0.0},
+            "controllerToTipOffsetMetres": {"x": 0.0, "y": 0.0, "z": 0.0},
+            "goodDistanceMetres": 0.025,
+            "maximumWeldDistanceMetres": 0.05,
+            "minimumGoodSpeedMetresPerSecond": 0.05,
+            "maximumGoodSpeedMetresPerSecond": 0.15,
+            "completionThreshold": 0.97,
+            "startProgressThreshold": 0.08,
+            "maximumProgressJump": 0.08,
+            "reverseProgressTolerance": 0.03,
+            "evaluateOrientation": False,
+            "orientationInhibitsWelding": False,
+            "localToolForwardAxis": {"x": 0.0, "y": 0.0, "z": 1.0},
+            "targetTravelAngleDegrees": 0.0,
+            "travelAngleToleranceDegrees": 15.0,
+            "targetWorkAngleDegrees": 45.0,
+            "workAngleToleranceDegrees": 15.0,
+        }
     (directory / "summary.json").write_text(json.dumps(summary), encoding="utf-8")
     (directory / "samples.csv").write_text(CSV_HEADER + CSV_ROWS, encoding="utf-8")
 
@@ -70,6 +95,7 @@ class SessionValidatorTests(unittest.TestCase):
         self.assertIn("Average error: 1.1 cm", result.stdout)
         self.assertIn("Quality in range: 100.0%", result.stdout)
         self.assertIn("Timing: attempt 2.0 s", result.stdout)
+        self.assertIn("prototype-straight-seam-v1, seam 0.5 m", result.stdout)
 
     def test_legacy_schema_four_quality_field_is_supported(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -79,6 +105,19 @@ class SessionValidatorTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("Quality in range: 100.0%", result.stdout)
+
+    def test_schema_six_requires_configuration_snapshot(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            session = Path(temporary_directory)
+            write_session(session)
+            summary_path = session / "summary.json"
+            summary = json.loads(summary_path.read_text(encoding="utf-8"))
+            del summary["configuration"]
+            summary_path.write_text(json.dumps(summary), encoding="utf-8")
+            result = self.run_validator(session)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("schema 6 summary is missing configuration", result.stderr)
 
     def test_sample_count_mismatch_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:

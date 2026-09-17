@@ -136,7 +136,10 @@ Session files are written below `Application.persistentDataPath` in
 quality state even when angle-based inhibition is disabled. The Unity Console
 prints the exact path after saving. The summary also records tracking
 interruption count, total invalid-tracking time, attempt duration, active
-welding time, and blocked-trigger time. On Quest,
+welding time, and blocked-trigger time. Schema v6 summaries also freeze the
+seam geometry, evaluator version, application/Unity/platform identity, tool
+offset, distance/speed/progress thresholds, and orientation settings used for
+that attempt. On Quest,
 retrieve the application files later through USB/ADB; data export is not needed
 for the live demonstration.
 
