@@ -82,14 +82,13 @@ namespace WeldingTrainer.Prototype
         private Vector3 _editorToolPosition;
         private float _smoothedSpeed;
         private float _beadProgress;
-        private float _errorSum;
-        private float _speedSum;
+        private float _errorMetreSeconds;
+        private float _speedMetres;
+        private float _goodQualitySeconds;
         private float _attemptStartedAt;
         private float _attemptFinishedAt;
         private float _weldingActiveSeconds;
         private float _blockedTriggerSeconds;
-        private int _sampleCount;
-        private int _goodSampleCount;
         private float _nextHapticTime;
         private float _nextAudioCueTime;
         private float _recordingStartedAt;
@@ -347,10 +346,10 @@ namespace WeldingTrainer.Prototype
                 (!evaluateOrientation || !orientationInhibitsWelding || orientationGood) &&
                 !_completed;
             bool welding = triggerPressed && activationAllowed;
+            float evaluationDelta = Mathf.Min(Time.unscaledDeltaTime, 0.25f);
 
             if (_attemptStarted && !_completed)
             {
-                float evaluationDelta = Mathf.Min(Time.unscaledDeltaTime, 0.25f);
                 if (welding)
                 {
                     _weldingActiveSeconds += evaluationDelta;
@@ -401,12 +400,11 @@ namespace WeldingTrainer.Prototype
 
             if (welding)
             {
-                _sampleCount++;
-                _errorSum += distance;
-                _speedSum += _smoothedSpeed;
+                _errorMetreSeconds += distance * evaluationDelta;
+                _speedMetres += _smoothedSpeed * evaluationDelta;
                 if (positionGood && speedGood && orientationGood)
                 {
-                    _goodSampleCount++;
+                    _goodQualitySeconds += evaluationDelta;
                 }
 
                 if (progress >= _beadProgress - 0.02f)
@@ -461,14 +459,12 @@ namespace WeldingTrainer.Prototype
         {
             if (_completed)
             {
-                float averageError = _sampleCount > 0 ? _errorSum / _sampleCount : 0f;
-                float averageSpeed = _sampleCount > 0 ? _speedSum / _sampleCount : 0f;
-                float quality = _sampleCount > 0 ? 100f * _goodSampleCount / _sampleCount : 0f;
+                GetQualityMetrics(out float averageError, out float averageSpeed, out float quality);
                 string saveStatus = _sessionSaved
                     ? "Results saved locally"
                     : "Result save failed - see Console";
                 return string.Format(
-                    "WELD COMPLETE\nCompletion: 100%\nAverage error: {0:0.0} cm\nAverage speed: {1:0.0} cm/s\nGood samples: {2:0}%\nTime: {3:0.0} s | Active: {4:0.0} s | Blocked: {5:0.0} s\nTracking interruptions: {6} ({7:0.0} s)\n{8}\nPress B or R to reset\nPress A or C to place a new seam",
+                    "WELD COMPLETE\nCompletion: 100%\nAverage error: {0:0.0} cm\nAverage speed: {1:0.0} cm/s\nQuality in range: {2:0}%\nTime: {3:0.0} s | Active: {4:0.0} s | Blocked: {5:0.0} s\nTracking interruptions: {6} ({7:0.0} s)\n{8}\nPress B or R to reset\nPress A or C to place a new seam",
                     averageError * 100f,
                     averageSpeed * 100f,
                     quality,
@@ -734,14 +730,13 @@ namespace WeldingTrainer.Prototype
             _isCalibrating = false;
             _attemptStarted = false;
             _beadProgress = 0f;
-            _errorSum = 0f;
-            _speedSum = 0f;
+            _errorMetreSeconds = 0f;
+            _speedMetres = 0f;
+            _goodQualitySeconds = 0f;
             _attemptStartedAt = 0f;
             _attemptFinishedAt = 0f;
             _weldingActiveSeconds = 0f;
             _blockedTriggerSeconds = 0f;
-            _sampleCount = 0;
-            _goodSampleCount = 0;
             _smoothedSpeed = 0f;
             _hasPreviousPosition = false;
             _completed = false;
@@ -819,9 +814,7 @@ namespace WeldingTrainer.Prototype
                 return;
             }
 
-            float averageError = _sampleCount > 0 ? _errorSum / _sampleCount : 0f;
-            float averageSpeed = _sampleCount > 0 ? _speedSum / _sampleCount : 0f;
-            float goodPercent = _sampleCount > 0 ? 100f * _goodSampleCount / _sampleCount : 0f;
+            GetQualityMetrics(out float averageError, out float averageSpeed, out float qualityPercent);
 
             try
             {
@@ -831,7 +824,7 @@ namespace WeldingTrainer.Prototype
                     _beadProgress,
                     averageError,
                     averageSpeed,
-                    goodPercent,
+                    qualityPercent,
                     _trackingInterruptionCount,
                     GetInvalidTrackingSeconds(),
                     GetAttemptElapsedSeconds(),
@@ -948,6 +941,24 @@ namespace WeldingTrainer.Prototype
                 ? _attemptFinishedAt
                 : Time.realtimeSinceStartup;
             return Mathf.Max(0f, finishedAt - _attemptStartedAt);
+        }
+
+        private void GetQualityMetrics(
+            out float averageError,
+            out float averageSpeed,
+            out float qualityPercent)
+        {
+            if (_weldingActiveSeconds <= Mathf.Epsilon)
+            {
+                averageError = 0f;
+                averageSpeed = 0f;
+                qualityPercent = 0f;
+                return;
+            }
+
+            averageError = _errorMetreSeconds / _weldingActiveSeconds;
+            averageSpeed = _speedMetres / _weldingActiveSeconds;
+            qualityPercent = 100f * _goodQualitySeconds / _weldingActiveSeconds;
         }
 
         private void CreateAudioFeedback()

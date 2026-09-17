@@ -32,8 +32,9 @@ Hall sensing, production-grade storage, or validated welding tolerances.
   the trigger must be released before the simulation can activate again.
 - Returning from a headset/application pause uses the same trigger-release
   re-arm rule.
-- Completion, mean error, mean speed, percentage of good samples, attempt time,
-  active welding time, and blocked-trigger time are shown.
+- Completion, time-weighted mean error, time-weighted mean speed, percentage of
+  active welding time within the quality range, attempt time, active welding
+  time, and blocked-trigger time are shown.
 - Each completed, reset, paused, or interrupted attempt is saved locally as a
   JSON summary and CSV sample stream.
 - The B button resets the attempt.
