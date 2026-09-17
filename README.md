@@ -144,3 +144,6 @@ It explains commits, branches, `.gitignore`, `.gitattributes`, Issues, Pull Requ
 
 The staged implementation plan is documented in
 **[`docs/roadmap.md`](docs/roadmap.md)**.
+
+The temporary presentation prototype and its Unity/Quest test procedure are
+documented in **[`docs/tomorrow-prototype-runbook.md`](docs/tomorrow-prototype-runbook.md)**.

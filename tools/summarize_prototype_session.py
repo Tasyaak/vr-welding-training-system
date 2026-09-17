@@ -1,0 +1,528 @@
+"""Validate and summarize one exported prototype session using only Python."""
+
+from __future__ import annotations
+
+import argparse
+import csv
+import hashlib
+import json
+import math
+import sys
+from pathlib import Path
+from typing import Any
+
+
+SUPPORTED_SCHEMA_VERSIONS = {2, 3, 4, 5, 6, 7, 8}
+REQUIRED_SUMMARY_FIELDS = (
+    "schemaVersion",
+    "sessionId",
+    "completed",
+    "finishReason",
+    "completion",
+    "averageErrorMetres",
+    "averageSpeedMetresPerSecond",
+    "sampleCount",
+)
+REQUIRED_SAMPLE_COLUMNS = (
+    "elapsed_s",
+    "seam_progress",
+    "distance_m",
+    "speed_mps",
+    "trigger",
+    "welding_allowed",
+)
+
+
+def finite_number(value: Any, field: str, errors: list[str]) -> float | None:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        errors.append(f"{field} is not a number: {value!r}")
+        return None
+
+    if not math.isfinite(number):
+        errors.append(f"{field} must be finite: {value!r}")
+        return None
+    return number
+
+
+def vector3(
+    value: Any, field: str, errors: list[str]
+) -> tuple[float, float, float] | None:
+    if not isinstance(value, dict):
+        errors.append(f"{field} must be an object with x, y, and z")
+        return None
+
+    components = tuple(
+        finite_number(value.get(axis), f"{field}.{axis}", errors)
+        for axis in ("x", "y", "z")
+    )
+    if any(component is None for component in components):
+        return None
+    return components  # type: ignore[return-value]
+
+
+def validate_session(session_path: Path) -> tuple[dict[str, Any], list[str], list[str]]:
+    session_directory = session_path.parent if session_path.is_file() else session_path
+    summary_path = session_directory / "summary.json"
+    samples_path = session_directory / "samples.csv"
+    errors: list[str] = []
+    warnings: list[str] = []
+
+    if not summary_path.is_file():
+        partial_note = (
+            "; a .partial summary exists, so saving did not complete"
+            if (session_directory / "summary.json.partial").exists()
+            else ""
+        )
+        return {}, [f"Missing summary file: {summary_path}{partial_note}"], warnings
+    if not samples_path.is_file():
+        partial_note = (
+            "; a .partial sample file exists, so saving did not complete"
+            if (session_directory / "samples.csv.partial").exists()
+            else ""
+        )
+        return {}, [f"Missing sample file: {samples_path}{partial_note}"], warnings
+
+    try:
+        summary = json.loads(summary_path.read_text(encoding="utf-8-sig"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exception:
+        return {}, [f"Cannot read summary.json: {exception}"], warnings
+
+    if not isinstance(summary, dict):
+        return {}, ["summary.json must contain one JSON object"], warnings
+
+    for field in REQUIRED_SUMMARY_FIELDS:
+        if field not in summary:
+            errors.append(f"summary.json is missing {field}")
+
+    schema_version = summary.get("schemaVersion")
+    if not isinstance(schema_version, int):
+        errors.append("schemaVersion must be an integer")
+    elif schema_version not in SUPPORTED_SCHEMA_VERSIONS:
+        warnings.append(
+            f"Schema version {schema_version} is not one of the tested versions "
+            f"{sorted(SUPPORTED_SCHEMA_VERSIONS)}"
+        )
+
+    if not isinstance(summary.get("completed"), bool):
+        errors.append("completed must be a boolean")
+    for field in ("sessionId", "finishReason"):
+        if not isinstance(summary.get(field), str) or not summary.get(field):
+            errors.append(f"{field} must be a non-empty string")
+
+    if isinstance(schema_version, int) and schema_version >= 3:
+        for field in ("trackingInterruptionCount", "invalidTrackingSeconds"):
+            if field not in summary:
+                errors.append(f"schema {schema_version} summary is missing {field}")
+    if isinstance(schema_version, int) and schema_version >= 4:
+        for field in (
+            "attemptElapsedSeconds",
+            "weldingActiveSeconds",
+            "blockedTriggerSeconds",
+        ):
+            if field not in summary:
+                errors.append(f"schema {schema_version} summary is missing {field}")
+    quality_field = (
+        "qualityInRangePercent"
+        if isinstance(schema_version, int) and schema_version >= 5
+        else "goodSamplePercent"
+    )
+    if quality_field not in summary:
+        errors.append(f"schema {schema_version} summary is missing {quality_field}")
+
+    recording_truncated = summary.get("recordingTruncated")
+    dropped_sample_count = summary.get("droppedSampleCount")
+    if isinstance(schema_version, int) and schema_version >= 7:
+        if not isinstance(recording_truncated, bool):
+            errors.append("recordingTruncated must be a boolean")
+        if (
+            not isinstance(dropped_sample_count, int)
+            or isinstance(dropped_sample_count, bool)
+            or dropped_sample_count < 0
+        ):
+            errors.append("droppedSampleCount must be a non-negative integer")
+        if isinstance(recording_truncated, bool) and isinstance(dropped_sample_count, int):
+            if recording_truncated != (dropped_sample_count > 0):
+                errors.append(
+                    "recordingTruncated must agree with whether droppedSampleCount is nonzero"
+                )
+            elif recording_truncated:
+                warnings.append(
+                    f"Recording reached its capacity and dropped {dropped_sample_count} samples"
+                )
+
+    configuration = summary.get("configuration")
+    configuration_report: dict[str, Any] = {}
+    if isinstance(schema_version, int) and schema_version >= 6:
+        if not isinstance(configuration, dict):
+            errors.append(f"schema {schema_version} summary is missing configuration")
+        else:
+            for field in (
+                "evaluatorVersion",
+                "applicationVersion",
+                "unityVersion",
+                "runtimePlatform",
+            ):
+                if not isinstance(configuration.get(field), str) or not configuration.get(field):
+                    errors.append(f"configuration.{field} must be a non-empty string")
+
+            seam_start = vector3(
+                configuration.get("seamStartWorldMetres"),
+                "configuration.seamStartWorldMetres",
+                errors,
+            )
+            seam_end = vector3(
+                configuration.get("seamEndWorldMetres"),
+                "configuration.seamEndWorldMetres",
+                errors,
+            )
+            vector3(
+                configuration.get("controllerToTipOffsetMetres"),
+                "configuration.controllerToTipOffsetMetres",
+                errors,
+            )
+            vector3(
+                configuration.get("localToolForwardAxis"),
+                "configuration.localToolForwardAxis",
+                errors,
+            )
+
+            numeric_configuration: dict[str, float | None] = {}
+            for field in (
+                "goodDistanceMetres",
+                "maximumWeldDistanceMetres",
+                "minimumGoodSpeedMetresPerSecond",
+                "maximumGoodSpeedMetresPerSecond",
+                "completionThreshold",
+                "startProgressThreshold",
+                "maximumProgressJump",
+                "reverseProgressTolerance",
+                "targetTravelAngleDegrees",
+                "travelAngleToleranceDegrees",
+                "targetWorkAngleDegrees",
+                "workAngleToleranceDegrees",
+            ):
+                numeric_configuration[field] = finite_number(
+                    configuration.get(field), f"configuration.{field}", errors
+                )
+                value = numeric_configuration[field]
+                if value is not None and value < 0:
+                    errors.append(f"configuration.{field} cannot be negative")
+
+            for field in ("evaluateOrientation", "orientationInhibitsWelding"):
+                if not isinstance(configuration.get(field), bool):
+                    errors.append(f"configuration.{field} must be a boolean")
+
+            good_distance = numeric_configuration["goodDistanceMetres"]
+            maximum_distance = numeric_configuration["maximumWeldDistanceMetres"]
+            minimum_speed = numeric_configuration["minimumGoodSpeedMetresPerSecond"]
+            maximum_speed = numeric_configuration["maximumGoodSpeedMetresPerSecond"]
+            if (
+                good_distance is not None
+                and maximum_distance is not None
+                and good_distance > maximum_distance
+            ):
+                errors.append("configuration good distance exceeds maximum weld distance")
+            if (
+                minimum_speed is not None
+                and maximum_speed is not None
+                and minimum_speed > maximum_speed
+            ):
+                errors.append("configuration minimum speed exceeds maximum speed")
+
+            seam_length = None
+            if seam_start is not None and seam_end is not None:
+                seam_length = math.sqrt(
+                    sum((end - start) ** 2 for start, end in zip(seam_start, seam_end))
+                )
+                if seam_length <= 0:
+                    errors.append("configuration seam length must be greater than zero")
+
+            configuration_report = {
+                "evaluatorVersion": configuration.get("evaluatorVersion"),
+                "applicationVersion": configuration.get("applicationVersion"),
+                "unityVersion": configuration.get("unityVersion"),
+                "runtimePlatform": configuration.get("runtimePlatform"),
+                "seamLengthMetres": seam_length,
+                "goodDistanceMetres": good_distance,
+                "maximumWeldDistanceMetres": maximum_distance,
+                "minimumGoodSpeedMetresPerSecond": minimum_speed,
+                "maximumGoodSpeedMetresPerSecond": maximum_speed,
+            }
+
+    completion = finite_number(summary.get("completion"), "completion", errors)
+    average_error = finite_number(
+        summary.get("averageErrorMetres"), "averageErrorMetres", errors
+    )
+    average_speed = finite_number(
+        summary.get("averageSpeedMetresPerSecond"),
+        "averageSpeedMetresPerSecond",
+        errors,
+    )
+    quality_percent = finite_number(
+        summary.get(quality_field), quality_field, errors
+    )
+    optional_numbers: dict[str, float | None] = {}
+    for field in (
+        "invalidTrackingSeconds",
+        "attemptElapsedSeconds",
+        "weldingActiveSeconds",
+        "blockedTriggerSeconds",
+    ):
+        optional_numbers[field] = (
+            finite_number(summary[field], field, errors) if field in summary else None
+        )
+
+    tracking_interruptions = summary.get("trackingInterruptionCount")
+    if tracking_interruptions is not None and (
+        not isinstance(tracking_interruptions, int)
+        or isinstance(tracking_interruptions, bool)
+        or tracking_interruptions < 0
+    ):
+        errors.append("trackingInterruptionCount must be a non-negative integer")
+
+    if completion is not None and not 0 <= completion <= 1:
+        errors.append(f"completion is outside 0..1: {completion}")
+    if quality_percent is not None and not 0 <= quality_percent <= 100:
+        errors.append(f"{quality_field} is outside 0..100: {quality_percent}")
+    if average_error is not None and average_error < 0:
+        errors.append("averageErrorMetres cannot be negative")
+    if average_speed is not None and average_speed < 0:
+        errors.append("averageSpeedMetresPerSecond cannot be negative")
+    for field, value in optional_numbers.items():
+        if value is not None and value < 0:
+            errors.append(f"{field} cannot be negative")
+
+    row_count = 0
+    previous_elapsed = -math.inf
+    try:
+        with samples_path.open("r", encoding="utf-8-sig", newline="") as stream:
+            reader = csv.DictReader(stream)
+            columns = reader.fieldnames or []
+            for column in REQUIRED_SAMPLE_COLUMNS:
+                if column not in columns:
+                    errors.append(f"samples.csv is missing column {column}")
+
+            if all(column in columns for column in REQUIRED_SAMPLE_COLUMNS):
+                for line_number, row in enumerate(reader, start=2):
+                    row_count += 1
+                    elapsed = finite_number(
+                        row["elapsed_s"], f"samples.csv line {line_number} elapsed_s", errors
+                    )
+                    progress = finite_number(
+                        row["seam_progress"],
+                        f"samples.csv line {line_number} seam_progress",
+                        errors,
+                    )
+                    distance = finite_number(
+                        row["distance_m"],
+                        f"samples.csv line {line_number} distance_m",
+                        errors,
+                    )
+                    speed = finite_number(
+                        row["speed_mps"],
+                        f"samples.csv line {line_number} speed_mps",
+                        errors,
+                    )
+
+                    if elapsed is not None:
+                        if elapsed < 0:
+                            errors.append(
+                                f"samples.csv line {line_number} elapsed_s cannot be negative"
+                            )
+                        if elapsed < previous_elapsed:
+                            errors.append(
+                                f"samples.csv line {line_number} time goes backwards"
+                            )
+                        previous_elapsed = elapsed
+                    if progress is not None and not 0 <= progress <= 1:
+                        errors.append(
+                            f"samples.csv line {line_number} seam_progress is outside 0..1"
+                        )
+                    if distance is not None and distance < 0:
+                        errors.append(
+                            f"samples.csv line {line_number} distance_m cannot be negative"
+                        )
+                    if speed is not None and speed < 0:
+                        errors.append(
+                            f"samples.csv line {line_number} speed_mps cannot be negative"
+                        )
+                    for column in ("trigger", "welding_allowed"):
+                        if row[column] not in {"0", "1"}:
+                            errors.append(
+                                f"samples.csv line {line_number} {column} must be 0 or 1"
+                            )
+    except (OSError, UnicodeError, csv.Error) as exception:
+        errors.append(f"Cannot read samples.csv: {exception}")
+
+    expected_count = summary.get("sampleCount")
+    if not isinstance(expected_count, int) or isinstance(expected_count, bool):
+        errors.append("sampleCount must be an integer")
+    elif expected_count != row_count:
+        errors.append(
+            f"sampleCount is {expected_count}, but samples.csv contains {row_count} rows"
+        )
+
+    csv_integrity_ok: bool | None = None
+    if isinstance(schema_version, int) and schema_version >= 8:
+        stored_byte_length = summary.get("csvByteLength")
+        stored_sha256 = summary.get("csvSha256")
+        if (
+            not isinstance(stored_byte_length, int)
+            or isinstance(stored_byte_length, bool)
+            or stored_byte_length < 0
+        ):
+            errors.append("csvByteLength must be a non-negative integer")
+        if not isinstance(stored_sha256, str) or len(stored_sha256) != 64:
+            errors.append("csvSha256 must be a 64-character lowercase hex string")
+        elif not all(c in "0123456789abcdef" for c in stored_sha256):
+            errors.append("csvSha256 must be a 64-character lowercase hex string")
+        if isinstance(stored_byte_length, int) and isinstance(stored_sha256, str):
+            try:
+                raw = samples_path.read_bytes()
+                actual_byte_length = len(raw)
+                actual_sha256 = hashlib.sha256(raw).hexdigest()
+                if actual_byte_length != stored_byte_length:
+                    errors.append(
+                        f"samples.csv byte length is {actual_byte_length}, "
+                        f"but csvByteLength is {stored_byte_length}"
+                    )
+                if actual_sha256 != stored_sha256:
+                    errors.append(
+                        f"samples.csv SHA-256 mismatch: "
+                        f"stored {stored_sha256}, actual {actual_sha256}"
+                    )
+                csv_integrity_ok = (
+                    actual_byte_length == stored_byte_length
+                    and actual_sha256 == stored_sha256
+                )
+            except OSError as exception:
+                errors.append(f"Cannot read samples.csv for integrity check: {exception}")
+
+    report = {
+        "sessionDirectory": str(session_directory.resolve()),
+        "schemaVersion": schema_version,
+        "sessionId": summary.get("sessionId"),
+        "completed": summary.get("completed"),
+        "finishReason": summary.get("finishReason"),
+        "completionPercent": completion * 100 if completion is not None else None,
+        "averageErrorCentimetres": average_error * 100 if average_error is not None else None,
+        "averageSpeedCentimetresPerSecond": (
+            average_speed * 100 if average_speed is not None else None
+        ),
+        "qualityInRangePercent": quality_percent,
+        "sampleCount": row_count,
+        "attemptElapsedSeconds": optional_numbers["attemptElapsedSeconds"],
+        "weldingActiveSeconds": optional_numbers["weldingActiveSeconds"],
+        "blockedTriggerSeconds": optional_numbers["blockedTriggerSeconds"],
+        "trackingInterruptionCount": tracking_interruptions,
+        "invalidTrackingSeconds": optional_numbers["invalidTrackingSeconds"],
+        "configuration": configuration_report or None,
+        "recordingTruncated": recording_truncated,
+        "droppedSampleCount": dropped_sample_count,
+        "csvIntegrityOk": csv_integrity_ok,
+    }
+    return report, errors, warnings
+
+
+def format_optional(value: Any, suffix: str = "") -> str:
+    return "not recorded" if value is None else f"{float(value):.1f}{suffix}"
+
+
+def print_human_report(
+    report: dict[str, Any], errors: list[str], warnings: list[str]
+) -> None:
+    if report:
+        tracking_interruptions = report.get("trackingInterruptionCount")
+        tracking_label = (
+            "not recorded" if tracking_interruptions is None else str(tracking_interruptions)
+        )
+        print(f"Session: {report.get('sessionId')}")
+        print(
+            "Status: "
+            + ("complete" if report.get("completed") else "incomplete")
+            + f" ({report.get('finishReason')})"
+        )
+        print(f"Completion: {format_optional(report.get('completionPercent'), '%')}")
+        print(
+            "Average error: "
+            f"{format_optional(report.get('averageErrorCentimetres'), ' cm')}"
+        )
+        print(
+            "Average speed: "
+            f"{format_optional(report.get('averageSpeedCentimetresPerSecond'), ' cm/s')}"
+        )
+        print(
+            "Quality in range: "
+            f"{format_optional(report.get('qualityInRangePercent'), '%')}"
+        )
+        print(f"Samples: {report.get('sampleCount')}")
+        print(
+            "Timing: "
+            f"attempt {format_optional(report.get('attemptElapsedSeconds'), ' s')}, "
+            f"active {format_optional(report.get('weldingActiveSeconds'), ' s')}, "
+            f"blocked {format_optional(report.get('blockedTriggerSeconds'), ' s')}"
+        )
+        print(
+            "Tracking: "
+            f"{tracking_label} interruptions, "
+            f"{format_optional(report.get('invalidTrackingSeconds'), ' s')} invalid"
+        )
+        configuration = report.get("configuration")
+        if configuration:
+            print(
+                "Configuration: "
+                f"{configuration.get('evaluatorVersion')}, "
+                f"seam {format_optional(configuration.get('seamLengthMetres'), ' m')}, "
+                f"distance {format_optional(configuration.get('goodDistanceMetres'), ' m')} good / "
+                f"{format_optional(configuration.get('maximumWeldDistanceMetres'), ' m')} max"
+            )
+            print(
+                "Build: "
+                f"app {configuration.get('applicationVersion')}, "
+                f"Unity {configuration.get('unityVersion')}, "
+                f"{configuration.get('runtimePlatform')}"
+            )
+        if report.get("recordingTruncated"):
+            print(
+                "Recording: TRUNCATED, "
+                f"{report.get('droppedSampleCount')} samples dropped"
+            )
+        if report.get("csvIntegrityOk") is not None:
+            integrity_label = "OK" if report["csvIntegrityOk"] else "FAILED"
+            print(f"Integrity: {integrity_label}")
+
+    for warning in warnings:
+        print(f"WARNING: {warning}", file=sys.stderr)
+    for error in errors:
+        print(f"ERROR: {error}", file=sys.stderr)
+    validation_status = "FAILED" if errors else "PASSED WITH WARNINGS" if warnings else "PASSED"
+    print("Validation: " + validation_status)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Validate and summarize a PrototypeSessions session directory."
+    )
+    parser.add_argument("session", type=Path, help="Session directory or summary.json path")
+    parser.add_argument(
+        "--json", action="store_true", help="Print the report and validation as JSON"
+    )
+    args = parser.parse_args()
+
+    report, errors, warnings = validate_session(args.session)
+    if args.json:
+        print(
+            json.dumps(
+                {"valid": not errors, "report": report, "warnings": warnings, "errors": errors},
+                indent=2,
+            )
+        )
+    else:
+        print_human_report(report, errors, warnings)
+    return 1 if errors else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
