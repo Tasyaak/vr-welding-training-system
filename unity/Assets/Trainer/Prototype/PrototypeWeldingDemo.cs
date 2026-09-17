@@ -49,9 +49,14 @@ namespace WeldingTrainer.Prototype
         private int _sampleCount;
         private int _goodSampleCount;
         private float _nextHapticTime;
+        private float _recordingStartedAt;
+        private float _nextRecordTime;
         private bool _hasPreviousPosition;
         private bool _seamPlaced;
         private bool _completed;
+        private bool _resetWasPressed;
+        private bool _sessionSaved;
+        private PrototypeSessionRecorder _recorder;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void AutoStart()
@@ -67,6 +72,7 @@ namespace WeldingTrainer.Prototype
 
         private void Start()
         {
+            _recorder = new PrototypeSessionRecorder();
             CreateToolTip();
             CreateGuide();
             CreateBead();
@@ -111,10 +117,11 @@ namespace WeldingTrainer.Prototype
                     out resetPressed);
             }
 
-            if (resetPressed)
+            if (resetPressed && !_resetWasPressed)
             {
                 ResetAttempt();
             }
+            _resetWasPressed = resetPressed;
 
             if (!trackingValid)
             {
@@ -178,6 +185,21 @@ namespace WeldingTrainer.Prototype
             bool speedGood = _smoothedSpeed >= MinimumGoodSpeed && _smoothedSpeed <= MaximumGoodSpeed;
             bool welding = triggerPressed && positionWeldable && !_completed;
 
+            if (_recorder != null &&
+                _recorder.IsActive &&
+                Time.realtimeSinceStartup >= _nextRecordTime)
+            {
+                _recorder.Record(
+                    Time.realtimeSinceStartup - _recordingStartedAt,
+                    _smoothedToolPosition,
+                    progress,
+                    distance,
+                    _smoothedSpeed,
+                    triggerPressed,
+                    positionWeldable && !_completed);
+                _nextRecordTime = Time.realtimeSinceStartup + 0.1f;
+            }
+
             Color stateColour = positionGood && speedGood
                 ? GoodColour
                 : positionWeldable
@@ -205,11 +227,12 @@ namespace WeldingTrainer.Prototype
                 SendWarningHaptic(stateColour);
             }
 
-            if (_beadProgress >= CompletionThreshold)
+            if (!_completed && _beadProgress >= CompletionThreshold)
             {
                 _completed = true;
                 _beadProgress = 1f;
                 UpdateBead();
+                FinishRecording(true, "completed");
             }
 
             SetHud(BuildStatusText(distance, progress, triggerPressed, positionWeldable));
@@ -226,11 +249,15 @@ namespace WeldingTrainer.Prototype
                 float averageError = _sampleCount > 0 ? _errorSum / _sampleCount : 0f;
                 float averageSpeed = _sampleCount > 0 ? _speedSum / _sampleCount : 0f;
                 float quality = _sampleCount > 0 ? 100f * _goodSampleCount / _sampleCount : 0f;
+                string saveStatus = _sessionSaved
+                    ? "Results saved locally"
+                    : "Result save failed - see Console";
                 return string.Format(
-                    "WELD COMPLETE\nCompletion: 100%\nAverage error: {0:0.0} cm\nAverage speed: {1:0.0} cm/s\nGood samples: {2:0}%\nPress B or R to reset",
+                    "WELD COMPLETE\nCompletion: 100%\nAverage error: {0:0.0} cm\nAverage speed: {1:0.0} cm/s\nGood samples: {2:0}%\n{3}\nPress B or R to reset",
                     averageError * 100f,
                     averageSpeed * 100f,
-                    quality);
+                    quality,
+                    saveStatus);
             }
 
             string positionLabel = distance <= GoodDistanceMetres
@@ -369,6 +396,7 @@ namespace WeldingTrainer.Prototype
             _smoothedToolPosition = _editorToolPosition;
             _seamPlaced = true;
             UpdateBead();
+            BeginRecording();
             return true;
         }
 
@@ -394,6 +422,7 @@ namespace WeldingTrainer.Prototype
 
         private void ResetAttempt()
         {
+            FinishRecording(false, "reset");
             _beadProgress = 0f;
             _errorSum = 0f;
             _speedSum = 0f;
@@ -402,7 +431,68 @@ namespace WeldingTrainer.Prototype
             _smoothedSpeed = 0f;
             _hasPreviousPosition = false;
             _completed = false;
+            _sessionSaved = false;
             UpdateBead();
+            BeginRecording();
+        }
+
+        private void BeginRecording()
+        {
+            if (_recorder == null)
+            {
+                return;
+            }
+
+            _recorder.Begin();
+            _sessionSaved = false;
+            _recordingStartedAt = Time.realtimeSinceStartup;
+            _nextRecordTime = _recordingStartedAt;
+        }
+
+        private void FinishRecording(bool completed, string reason)
+        {
+            if (_recorder == null || !_recorder.IsActive)
+            {
+                return;
+            }
+
+            float averageError = _sampleCount > 0 ? _errorSum / _sampleCount : 0f;
+            float averageSpeed = _sampleCount > 0 ? _speedSum / _sampleCount : 0f;
+            float goodPercent = _sampleCount > 0 ? 100f * _goodSampleCount / _sampleCount : 0f;
+
+            try
+            {
+                string savedDirectory = _recorder.Finish(
+                    completed,
+                    reason,
+                    _beadProgress,
+                    averageError,
+                    averageSpeed,
+                    goodPercent);
+                _sessionSaved = !string.IsNullOrEmpty(savedDirectory);
+            }
+            catch (Exception exception)
+            {
+                _sessionSaved = false;
+                Debug.LogError($"Could not save prototype session: {exception}");
+            }
+        }
+
+        private void OnApplicationPause(bool paused)
+        {
+            if (paused)
+            {
+                FinishRecording(false, "application_paused");
+            }
+            else if (_seamPlaced && !_completed && _recorder != null && !_recorder.IsActive)
+            {
+                BeginRecording();
+            }
+        }
+
+        private void OnApplicationQuit()
+        {
+            FinishRecording(false, "application_quit");
         }
 
         private void SendWarningHaptic(Color stateColour)
