@@ -46,6 +46,10 @@ namespace WeldingTrainer.Prototype
         [SerializeField, Range(0f, 180f)] private float targetWorkAngleDegrees = 45f;
         [SerializeField, Range(0f, 90f)] private float workAngleToleranceDegrees = 15f;
 
+        [Header("Presentation feedback")]
+        [SerializeField] private bool enableAudioFeedback = true;
+        [SerializeField, Range(0f, 1f)] private float audioFeedbackVolume = 0.25f;
+
         private static readonly Color GoodColour = new Color(0.1f, 1f, 0.25f, 1f);
         private static readonly Color WarningColour = new Color(1f, 0.75f, 0.05f, 1f);
         private static readonly Color BadColour = new Color(1f, 0.12f, 0.08f, 1f);
@@ -58,6 +62,10 @@ namespace WeldingTrainer.Prototype
         private LineRenderer _guide;
         private LineRenderer _bead;
         private TextMesh _hud;
+        private AudioSource _audioSource;
+        private AudioClip _weldStartedClip;
+        private AudioClip _weldInhibitedClip;
+        private AudioClip _weldCompletedClip;
 
         private Vector3 _seamStart;
         private Vector3 _seamEnd;
@@ -71,6 +79,7 @@ namespace WeldingTrainer.Prototype
         private int _sampleCount;
         private int _goodSampleCount;
         private float _nextHapticTime;
+        private float _nextAudioCueTime;
         private float _recordingStartedAt;
         private float _nextRecordTime;
         private bool _hasPreviousPosition;
@@ -84,6 +93,15 @@ namespace WeldingTrainer.Prototype
         private Vector3 _calibrationStart;
         private string _calibrationMessage;
         private PrototypeSessionRecorder _recorder;
+        private FeedbackAudioState _feedbackAudioState;
+
+        private enum FeedbackAudioState
+        {
+            Idle,
+            Active,
+            Inhibited,
+            Completed
+        }
 
 #if UNITY_EDITOR
         private bool _autoRehearsal;
@@ -110,6 +128,7 @@ namespace WeldingTrainer.Prototype
             CreateGuide();
             CreateBead();
             CreateHud();
+            CreateAudioFeedback();
             ResolveTrackingOrigin();
         }
 
@@ -344,6 +363,8 @@ namespace WeldingTrainer.Prototype
                 UpdateBead();
                 FinishRecording(true, "completed");
             }
+
+            UpdateAudioFeedback(triggerPressed, activationAllowed, welding);
 
             SetHud(BuildStatusText(
                 distance,
@@ -641,6 +662,7 @@ namespace WeldingTrainer.Prototype
             _hasPreviousPosition = false;
             _completed = false;
             _sessionSaved = false;
+            _feedbackAudioState = FeedbackAudioState.Idle;
             _guide.SetPosition(0, _seamStart);
             _guide.SetPosition(1, _seamEnd);
             UpdateBead();
@@ -759,6 +781,98 @@ namespace WeldingTrainer.Prototype
 
             _rightController.SendHapticImpulse(0u, amplitude, 0.04f);
             _nextHapticTime = Time.unscaledTime + 0.12f;
+        }
+
+        private void CreateAudioFeedback()
+        {
+            _audioSource = gameObject.AddComponent<AudioSource>();
+            _audioSource.playOnAwake = false;
+            _audioSource.spatialBlend = 0f;
+            _audioSource.volume = audioFeedbackVolume;
+
+            _weldStartedClip = CreateToneClip("Weld started", 660f, 820f, 0.09f);
+            _weldInhibitedClip = CreateToneClip("Weld inhibited", 240f, 150f, 0.14f);
+            _weldCompletedClip = CreateToneClip("Weld completed", 620f, 1040f, 0.28f);
+        }
+
+        private void UpdateAudioFeedback(
+            bool triggerPressed,
+            bool activationAllowed,
+            bool welding)
+        {
+            FeedbackAudioState nextState;
+            if (_completed)
+            {
+                nextState = FeedbackAudioState.Completed;
+            }
+            else if (welding)
+            {
+                nextState = FeedbackAudioState.Active;
+            }
+            else if (triggerPressed && !activationAllowed)
+            {
+                nextState = FeedbackAudioState.Inhibited;
+            }
+            else
+            {
+                nextState = FeedbackAudioState.Idle;
+            }
+
+            if (nextState == _feedbackAudioState)
+            {
+                return;
+            }
+
+            _feedbackAudioState = nextState;
+            if (!enableAudioFeedback || _audioSource == null)
+            {
+                return;
+            }
+
+            AudioClip cue = nextState switch
+            {
+                FeedbackAudioState.Active => _weldStartedClip,
+                FeedbackAudioState.Inhibited => _weldInhibitedClip,
+                FeedbackAudioState.Completed => _weldCompletedClip,
+                _ => null
+            };
+
+            if (cue != null)
+            {
+                if (nextState != FeedbackAudioState.Completed &&
+                    Time.unscaledTime < _nextAudioCueTime)
+                {
+                    return;
+                }
+
+                _audioSource.PlayOneShot(cue);
+                _nextAudioCueTime = Time.unscaledTime + 0.25f;
+            }
+        }
+
+        private static AudioClip CreateToneClip(
+            string clipName,
+            float startFrequency,
+            float endFrequency,
+            float durationSeconds)
+        {
+            const int sampleRate = 22050;
+            int sampleCount = Mathf.CeilToInt(sampleRate * durationSeconds);
+            var samples = new float[sampleCount];
+            float phase = 0f;
+
+            for (int index = 0; index < sampleCount; index++)
+            {
+                float progress = index / (float)Mathf.Max(1, sampleCount - 1);
+                float frequency = Mathf.Lerp(startFrequency, endFrequency, progress);
+                phase += 2f * Mathf.PI * frequency / sampleRate;
+                float envelope = Mathf.Sin(Mathf.PI * progress);
+                samples[index] = Mathf.Sin(phase) * envelope * 0.35f;
+            }
+
+            AudioClip clip = AudioClip.Create(clipName, sampleCount, 1, sampleRate, false);
+            clip.SetData(samples, 0);
+            return clip;
         }
 
         private void CreateToolTip()

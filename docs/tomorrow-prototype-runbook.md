@@ -2,7 +2,7 @@
 
 This branch is a **presentation prototype**, not the final project architecture.
 It demonstrates controller-based seam following without QR registration, ESP32,
-Hall sensing, persistent logs, or validated welding tolerances.
+Hall sensing, production-grade storage, or validated welding tolerances.
 
 ## Demonstrated behavior
 
@@ -18,6 +18,8 @@ Hall sensing, persistent logs, or validated welding tolerances.
   or reversing beyond the small continuity tolerance inhibits activation, so
   skipped regions are not credited.
 - Controller haptics warn about marginal or invalid movement.
+- Short generated audio cues announce welding start, inhibition, and completion;
+  no external sound assets are required.
 - Completion, mean error, mean speed, and percentage of good samples are shown.
 - Each completed, reset, paused, or interrupted attempt is saved locally as a
   JSON summary and CSV sample stream.
@@ -38,6 +40,10 @@ after verifying which local controller/attachment axis points toward the tool
 tip. Configure that axis, the target angles, and tolerances in the same
 Inspector. Keep **Orientation Inhibits Welding** disabled for the presentation
 until the physical axis and angle convention have been checked on-device.
+
+Audio feedback is enabled by default at a conservative volume. It can be
+disabled or adjusted on a scene instance of `PrototypeWeldingDemo` if the
+presentation room or headset audio setup makes the cues distracting.
 
 ## Required Unity setup
 
@@ -94,7 +100,8 @@ as the emergency presentation fallback; do not present it as device tracking.
 5. Put the right controller at the physical seam start and press A. Move it to
    the seam end and press A again. The two points must be 15 cm to 1.5 m apart.
 6. Return to the start, hold the trigger, and follow the displayed seam.
-7. Verify position/speed feedback, haptics, bead progress, completion, and reset.
+7. Verify position/speed feedback, audio cues, haptics, bead progress,
+   completion, and reset.
 8. As a negative test, release the trigger, jump well ahead of the bead edge,
    and hold it again. Activation must remain inhibited until returning to the
    current bead edge.
