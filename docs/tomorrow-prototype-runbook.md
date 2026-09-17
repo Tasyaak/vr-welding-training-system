@@ -127,6 +127,21 @@ welding time, and blocked-trigger time. On Quest,
 retrieve the application files later through USB/ADB; data export is not needed
 for the live demonstration.
 
+### Validate an exported session
+
+After copying one session directory to a computer, validate it and print its
+result metrics from the repository root:
+
+```powershell
+python tools/summarize_prototype_session.py "<path-to-session-directory>"
+```
+
+The command uses only the Python standard library. It checks the JSON/CSV
+structure, numeric ranges, timestamp order, progress range, boolean values, and
+sample-count agreement. It exits with a nonzero status and prints specific
+errors when a recording is incomplete or inconsistent. Add `--json` when
+machine-readable output is preferable.
+
 If controller-to-tip placement is visibly wrong, record the symptom and adjust
 the prototype only enough for the presentation. The final project will use a
 versioned physical attachment transform.

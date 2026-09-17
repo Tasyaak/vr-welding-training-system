@@ -1,0 +1,96 @@
+"""Tests for the dependency-free prototype session validator."""
+
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+SCRIPT = ROOT / "tools" / "summarize_prototype_session.py"
+CSV_HEADER = (
+    "elapsed_s,tool_x_m,tool_y_m,tool_z_m,seam_progress,distance_m,"
+    "speed_mps,travel_angle_deg,work_angle_deg,orientation_good,trigger,"
+    "welding_allowed\n"
+)
+CSV_ROWS = (
+    "0.000,0,0,0,0.000,0.010,0.050,0,45,1,1,1\n"
+    "0.100,0.01,0,0,0.020,0.012,0.060,0,45,1,1,1\n"
+)
+
+
+def write_session(directory: Path, sample_count: int = 2) -> None:
+    summary = {
+        "schemaVersion": 4,
+        "sessionId": "test-session",
+        "startedUtc": "2026-09-17T10:00:00Z",
+        "finishedUtc": "2026-09-17T10:00:02Z",
+        "completed": True,
+        "finishReason": "completed",
+        "completion": 1.0,
+        "averageErrorMetres": 0.011,
+        "averageSpeedMetresPerSecond": 0.055,
+        "goodSamplePercent": 100.0,
+        "trackingInterruptionCount": 0,
+        "invalidTrackingSeconds": 0.0,
+        "attemptElapsedSeconds": 2.0,
+        "weldingActiveSeconds": 1.8,
+        "blockedTriggerSeconds": 0.1,
+        "sampleCount": sample_count,
+    }
+    (directory / "summary.json").write_text(json.dumps(summary), encoding="utf-8")
+    (directory / "samples.csv").write_text(CSV_HEADER + CSV_ROWS, encoding="utf-8")
+
+
+class SessionValidatorTests(unittest.TestCase):
+    def run_validator(self, directory: Path) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [sys.executable, str(SCRIPT), str(directory)],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+    def test_valid_session_passes_and_prints_metrics(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            session = Path(temporary_directory)
+            write_session(session)
+            result = self.run_validator(session)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Validation: PASSED", result.stdout)
+        self.assertIn("Average error: 1.1 cm", result.stdout)
+        self.assertIn("Timing: attempt 2.0 s", result.stdout)
+
+    def test_sample_count_mismatch_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            session = Path(temporary_directory)
+            write_session(session, sample_count=3)
+            result = self.run_validator(session)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("samples.csv contains 2 rows", result.stderr)
+        self.assertIn("Validation: FAILED", result.stdout)
+
+    def test_invalid_timing_value_is_reported_without_crashing(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            session = Path(temporary_directory)
+            write_session(session)
+            summary_path = session / "summary.json"
+            summary = json.loads(summary_path.read_text(encoding="utf-8"))
+            summary["attemptElapsedSeconds"] = "not-a-number"
+            summary_path.write_text(json.dumps(summary), encoding="utf-8")
+            result = self.run_validator(session)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("attemptElapsedSeconds is not a number", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+
+
+if __name__ == "__main__":
+    unittest.main()
