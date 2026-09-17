@@ -21,6 +21,9 @@ namespace WeldingTrainer.Prototype
         private const float MinimumGoodSpeed = 0.05f;
         private const float MaximumGoodSpeed = 0.15f;
         private const float CompletionThreshold = 0.97f;
+        private const float StartProgressThreshold = 0.08f;
+        private const float MaximumProgressJump = 0.08f;
+        private const float ReverseProgressTolerance = 0.03f;
         private const float MinimumCalibrationLength = 0.15f;
         private const float MaximumCalibrationLength = 1.5f;
         private const float PositionSmoothing = 16f;
@@ -55,6 +58,7 @@ namespace WeldingTrainer.Prototype
         private float _nextRecordTime;
         private bool _hasPreviousPosition;
         private bool _seamPlaced;
+        private bool _attemptStarted;
         private bool _completed;
         private bool _resetWasPressed;
         private bool _calibrateWasPressed;
@@ -214,7 +218,22 @@ namespace WeldingTrainer.Prototype
             bool positionGood = distance <= GoodDistanceMetres;
             bool positionWeldable = distance <= MaximumWeldDistanceMetres;
             bool speedGood = _smoothedSpeed >= MinimumGoodSpeed && _smoothedSpeed <= MaximumGoodSpeed;
-            bool welding = triggerPressed && positionWeldable && !_completed;
+            bool nearStart = progress <= StartProgressThreshold;
+
+            if (!_attemptStarted && triggerPressed && positionWeldable && nearStart)
+            {
+                _attemptStarted = true;
+            }
+
+            bool progressContinuous =
+                progress <= _beadProgress + MaximumProgressJump &&
+                progress >= _beadProgress - ReverseProgressTolerance;
+            bool activationAllowed =
+                _attemptStarted &&
+                positionWeldable &&
+                progressContinuous &&
+                !_completed;
+            bool welding = triggerPressed && activationAllowed;
 
             if (_recorder != null &&
                 _recorder.IsActive &&
@@ -227,15 +246,23 @@ namespace WeldingTrainer.Prototype
                     distance,
                     _smoothedSpeed,
                     triggerPressed,
-                    positionWeldable && !_completed);
+                    activationAllowed);
                 _nextRecordTime = Time.realtimeSinceStartup + 0.1f;
             }
 
-            Color stateColour = positionGood && speedGood
-                ? GoodColour
-                : positionWeldable
-                    ? WarningColour
-                    : BadColour;
+            Color stateColour;
+            if (triggerPressed && !activationAllowed)
+            {
+                stateColour = BadColour;
+            }
+            else if (positionGood && speedGood)
+            {
+                stateColour = GoodColour;
+            }
+            else
+            {
+                stateColour = positionWeldable ? WarningColour : BadColour;
+            }
             SetToolColour(stateColour);
             SetGuideColour(stateColour);
 
@@ -266,14 +293,22 @@ namespace WeldingTrainer.Prototype
                 FinishRecording(true, "completed");
             }
 
-            SetHud(BuildStatusText(distance, progress, triggerPressed, positionWeldable));
+            SetHud(BuildStatusText(
+                distance,
+                progress,
+                triggerPressed,
+                positionWeldable,
+                nearStart,
+                progressContinuous));
         }
 
         private string BuildStatusText(
             float distance,
             float progress,
             bool triggerPressed,
-            bool positionWeldable)
+            bool positionWeldable,
+            bool nearStart,
+            bool progressContinuous)
         {
             if (_completed)
             {
@@ -301,9 +336,27 @@ namespace WeldingTrainer.Prototype
                 : _smoothedSpeed > MaximumGoodSpeed
                     ? "Speed: TOO FAST"
                     : "Speed: GOOD";
-            string activationLabel = triggerPressed
-                ? positionWeldable ? "Laser simulation: ACTIVE" : "Laser simulation: INHIBITED"
-                : "Hold trigger to weld";
+            string activationLabel;
+            if (!_attemptStarted)
+            {
+                activationLabel = nearStart
+                    ? "At seam start - hold trigger to begin"
+                    : "Move to the seam start";
+            }
+            else if (!positionWeldable)
+            {
+                activationLabel = "Laser simulation: INHIBITED - too far";
+            }
+            else if (!progressContinuous)
+            {
+                activationLabel = "Laser simulation: INHIBITED - return to bead edge";
+            }
+            else
+            {
+                activationLabel = triggerPressed
+                    ? "Laser simulation: ACTIVE"
+                    : "Hold trigger to weld";
+            }
 
             return string.Format(
                 "{0}\n{1}\nError: {2:0.0} cm\nProgress: {3:0}%\n{4}\nPress A or C to place seam",
@@ -505,6 +558,7 @@ namespace WeldingTrainer.Prototype
         {
             FinishRecording(false, "reset");
             _isCalibrating = false;
+            _attemptStarted = false;
             _beadProgress = 0f;
             _errorSum = 0f;
             _speedSum = 0f;

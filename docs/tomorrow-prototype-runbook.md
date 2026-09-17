@@ -14,6 +14,9 @@ Hall sensing, persistent logs, or validated welding tolerances.
 - Position and movement speed are classified as good, warning, or bad.
 - Holding the right trigger produces a progressive virtual bead while the tip
   remains within 5 cm of the seam.
+- Welding must begin within the first 8% of the directed seam. Jumping forward
+  or reversing beyond the small continuity tolerance inhibits activation, so
+  skipped regions are not credited.
 - Controller haptics warn about marginal or invalid movement.
 - Completion, mean error, mean speed, and percentage of good samples are shown.
 - Each completed, reset, paused, or interrupted attempt is saved locally as a
@@ -79,6 +82,9 @@ as the emergency presentation fallback; do not present it as device tracking.
    the seam end and press A again. The two points must be 15 cm to 1.5 m apart.
 6. Return to the start, hold the trigger, and follow the displayed seam.
 7. Verify position/speed feedback, haptics, bead progress, completion, and reset.
+8. As a negative test, release the trigger, jump well ahead of the bead edge,
+   and hold it again. Activation must remain inhibited until returning to the
+   current bead edge.
 
 Session files are written below `Application.persistentDataPath` in
 `PrototypeSessions/<session-id>/`. Each directory contains `summary.json` and
