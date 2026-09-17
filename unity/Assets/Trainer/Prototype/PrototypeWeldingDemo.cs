@@ -64,6 +64,11 @@ namespace WeldingTrainer.Prototype
         private string _calibrationMessage;
         private PrototypeSessionRecorder _recorder;
 
+#if UNITY_EDITOR
+        private bool _autoRehearsal;
+        private float _autoRehearsalStartedAt;
+#endif
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void AutoStart()
         {
@@ -371,6 +376,50 @@ namespace WeldingTrainer.Prototype
             out bool calibratePressed)
         {
             Keyboard keyboard = Keyboard.current;
+
+            if (keyboard.pKey.wasPressedThisFrame)
+            {
+                _autoRehearsal = !_autoRehearsal;
+                if (_autoRehearsal)
+                {
+                    ResetAttempt();
+                    _autoRehearsalStartedAt = Time.unscaledTime;
+                }
+            }
+
+            if (_autoRehearsal)
+            {
+                float cycleTime = Time.unscaledTime - _autoRehearsalStartedAt;
+                if (cycleTime >= 10f)
+                {
+                    ResetAttempt();
+                    _autoRehearsalStartedAt = Time.unscaledTime;
+                    cycleTime = 0f;
+                }
+
+                if (cycleTime < 1f)
+                {
+                    worldPosition = _seamStart + Vector3.up * 0.07f;
+                    triggerPressed = false;
+                }
+                else
+                {
+                    float progress = Mathf.Clamp01((cycleTime - 1f) / 6f);
+                    float demonstrationWobble = Mathf.Sin(progress * Mathf.PI * 4f) * 0.006f;
+                    worldPosition =
+                        Vector3.Lerp(_seamStart, _seamEnd, progress) +
+                        Vector3.up * demonstrationWobble;
+                    triggerPressed = progress < 1f;
+                }
+
+                _editorToolPosition = worldPosition;
+                trackingValid = true;
+                worldRotation = Quaternion.identity;
+                resetPressed = false;
+                calibratePressed = false;
+                return;
+            }
+
             float movementSpeed = keyboard.leftShiftKey.isPressed ? 0.35f : 0.12f;
             Vector3 movement = Vector3.zero;
 

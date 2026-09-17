@@ -56,11 +56,17 @@ Press Play. The prototype starts automatically.
 | Left Shift | Move faster |
 | Space | Hold simulated trigger |
 | `C` | Capture the start/end point for demo seam placement |
+| `P` | Toggle an automatic repeating rehearsal pass |
 | `R` | Reset attempt |
 
 Expected result: the sphere follows the simulated tool, feedback changes
 between red/yellow/green, holding Space extends the bead, and reaching the end
 shows the result summary.
+
+If the live Quest demonstration is not ready, press `P` in Play Mode to run a
+repeating automatic rehearsal. It begins away from the seam to show inhibited
+feedback, then performs a valid pass, displays results, and resets. Record this
+as the emergency presentation fallback; do not present it as device tracking.
 
 ## Quest build and smoke test
 
