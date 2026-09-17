@@ -26,6 +26,8 @@ Hall sensing, production-grade storage, or validated welding tolerances.
   no external sound assets are required.
 - A dark-backed, head-relative HUD keeps instructions and results readable over
   bright or visually busy passthrough scenes.
+- A permanent mode banner distinguishes Quest controller tracking from Editor
+  keyboard simulation and the automatic rehearsal fallback.
 - Losing controller tracking immediately pauses welding. After tracking returns,
   the trigger must be released before the simulation can activate again.
 - Returning from a headset/application pause uses the same trigger-release
@@ -104,6 +106,7 @@ If the live Quest demonstration is not ready, press `P` in Play Mode to run a
 repeating automatic rehearsal. It begins away from the seam to show inhibited
 feedback, then performs a valid pass, displays results, and resets. Record this
 as the emergency presentation fallback; do not present it as device tracking.
+The HUD deliberately labels this mode **EDITOR AUTO REHEARSAL (SIMULATED)**.
 
 ## Quest build and smoke test
 

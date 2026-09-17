@@ -50,7 +50,7 @@ namespace WeldingTrainer.Prototype
         [SerializeField] private bool enableAudioFeedback = true;
         [SerializeField, Range(0f, 1f)] private float audioFeedbackVolume = 0.25f;
         [SerializeField] private bool showHudBackground = true;
-        [SerializeField] private Vector2 hudBackgroundSize = new Vector2(0.68f, 0.42f);
+        [SerializeField] private Vector2 hudBackgroundSize = new Vector2(0.68f, 0.46f);
 
         private static readonly Color GoodColour = new Color(0.1f, 1f, 0.25f, 1f);
         private static readonly Color WarningColour = new Color(1f, 0.75f, 0.05f, 1f);
@@ -122,6 +122,7 @@ namespace WeldingTrainer.Prototype
 
 #if UNITY_EDITOR
         private bool _autoRehearsal;
+        private bool _usingEditorInput;
         private float _autoRehearsalStartedAt;
 #endif
 
@@ -195,6 +196,7 @@ namespace WeldingTrainer.Prototype
             EnsureDevice(ref _rightController, XRNode.RightHand);
             if (!_rightController.isValid && Keyboard.current != null)
             {
+                _usingEditorInput = true;
                 ReadEditorInput(
                     out trackingValid,
                     out rawToolPosition,
@@ -206,6 +208,9 @@ namespace WeldingTrainer.Prototype
             else
 #endif
             {
+#if UNITY_EDITOR
+                _usingEditorInput = false;
+#endif
                 ReadXrInput(
                     out trackingValid,
                     out rawToolPosition,
@@ -1222,8 +1227,24 @@ namespace WeldingTrainer.Prototype
         {
             if (_hud != null)
             {
-                _hud.text = message;
+                _hud.text = GetInputModeLabel() + "\n" + message;
             }
+        }
+
+        private string GetInputModeLabel()
+        {
+#if UNITY_EDITOR
+            if (_usingEditorInput)
+            {
+                return _autoRehearsal
+                    ? "MODE: EDITOR AUTO REHEARSAL (SIMULATED)"
+                    : "MODE: EDITOR KEYBOARD (SIMULATED)";
+            }
+
+            return "MODE: XR CONTROLLER (UNITY EDITOR)";
+#else
+            return "MODE: QUEST XR CONTROLLER";
+#endif
         }
     }
 }
