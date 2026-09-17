@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
 import sys
@@ -24,7 +25,7 @@ CSV_ROWS = (
 
 
 def write_session(
-    directory: Path, sample_count: int = 2, schema_version: int = 7
+    directory: Path, sample_count: int = 2, schema_version: int = 8
 ) -> None:
     summary = {
         "schemaVersion": schema_version,
@@ -73,8 +74,12 @@ def write_session(
     if schema_version >= 7:
         summary["recordingTruncated"] = False
         summary["droppedSampleCount"] = 0
+    csv_bytes = (CSV_HEADER + CSV_ROWS).encode("utf-8")
+    if schema_version >= 8:
+        summary["csvByteLength"] = len(csv_bytes)
+        summary["csvSha256"] = hashlib.sha256(csv_bytes).hexdigest()
     (directory / "summary.json").write_text(json.dumps(summary), encoding="utf-8")
-    (directory / "samples.csv").write_text(CSV_HEADER + CSV_ROWS, encoding="utf-8")
+    (directory / "samples.csv").write_bytes(csv_bytes)
 
 
 class SessionValidatorTests(unittest.TestCase):
@@ -112,7 +117,7 @@ class SessionValidatorTests(unittest.TestCase):
     def test_schema_seven_requires_configuration_snapshot(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             session = Path(temporary_directory)
-            write_session(session)
+            write_session(session, schema_version=7)
             summary_path = session / "summary.json"
             summary = json.loads(summary_path.read_text(encoding="utf-8"))
             del summary["configuration"]
@@ -125,7 +130,7 @@ class SessionValidatorTests(unittest.TestCase):
     def test_truncated_recording_is_reported_as_warning(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             session = Path(temporary_directory)
-            write_session(session)
+            write_session(session, schema_version=7)
             summary_path = session / "summary.json"
             summary = json.loads(summary_path.read_text(encoding="utf-8"))
             summary["recordingTruncated"] = True
@@ -160,7 +165,7 @@ class SessionValidatorTests(unittest.TestCase):
     def test_invalid_timing_value_is_reported_without_crashing(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             session = Path(temporary_directory)
-            write_session(session)
+            write_session(session, schema_version=7)
             summary_path = session / "summary.json"
             summary = json.loads(summary_path.read_text(encoding="utf-8"))
             summary["attemptElapsedSeconds"] = "not-a-number"
@@ -170,6 +175,44 @@ class SessionValidatorTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("attemptElapsedSeconds is not a number", result.stderr)
         self.assertNotIn("Traceback", result.stderr)
+
+    def test_schema_eight_csv_integrity_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            session = Path(temporary_directory)
+            write_session(session)
+            result = self.run_validator(session)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Integrity: OK", result.stdout)
+        self.assertIn("Validation: PASSED", result.stdout)
+
+    def test_tampered_csv_fails_integrity_check(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            session = Path(temporary_directory)
+            write_session(session)
+            # Append a space to change content without altering byte length padding
+            original = (session / "samples.csv").read_bytes()
+            tampered = original[:-1] + b"X"
+            (session / "samples.csv").write_bytes(tampered)
+            result = self.run_validator(session)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("SHA-256 mismatch", result.stderr)
+        self.assertIn("Validation: FAILED", result.stdout)
+
+    def test_wrong_byte_length_fails_integrity_check(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            session = Path(temporary_directory)
+            write_session(session)
+            summary_path = session / "summary.json"
+            summary = json.loads(summary_path.read_text(encoding="utf-8"))
+            summary["csvByteLength"] = summary["csvByteLength"] + 99
+            summary_path.write_text(json.dumps(summary), encoding="utf-8")
+            result = self.run_validator(session)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("byte length", result.stderr)
+        self.assertIn("Validation: FAILED", result.stdout)
 
 
 if __name__ == "__main__":

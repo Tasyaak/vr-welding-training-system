@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Security.Cryptography;
 using System.Text;
 using UnityEngine;
 
@@ -102,7 +103,7 @@ namespace WeldingTrainer.Prototype
 
             var summary = new SummaryRecord
             {
-                schemaVersion = 7,
+                schemaVersion = 8,
                 sessionId = _sessionId,
                 startedUtc = _startedUtc,
                 finishedUtc = DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture),
@@ -129,6 +130,7 @@ namespace WeldingTrainer.Prototype
             string summaryPartialPath = summaryPath + ".partial";
 
             WriteSamples(samplesPartialPath);
+            (summary.csvByteLength, summary.csvSha256) = ComputeCsvIntegrity(samplesPartialPath);
             WriteText(summaryPartialPath, JsonUtility.ToJson(summary, true));
             File.Move(samplesPartialPath, samplesPath);
             File.Move(summaryPartialPath, summaryPath);
@@ -137,6 +139,16 @@ namespace WeldingTrainer.Prototype
             LastRecordingTruncated = _droppedSampleCount > 0;
             Debug.Log($"Prototype session saved to: {sessionDirectory}");
             return sessionDirectory;
+        }
+
+        private static (int byteLength, string sha256Hex) ComputeCsvIntegrity(string path)
+        {
+            int byteLength = (int)new FileInfo(path).Length;
+            using var sha256 = SHA256.Create();
+            using var stream = File.OpenRead(path);
+            byte[] hash = sha256.ComputeHash(stream);
+            string hex = BitConverter.ToString(hash).Replace("-", string.Empty).ToLowerInvariant();
+            return (byteLength, hex);
         }
 
         private static void WriteText(string path, string contents)
@@ -234,6 +246,8 @@ namespace WeldingTrainer.Prototype
             public bool recordingTruncated;
             public int droppedSampleCount;
             public int sampleCount;
+            public int csvByteLength;
+            public string csvSha256;
         }
 
         private struct SampleRecord

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import math
 import sys
@@ -11,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 
-SUPPORTED_SCHEMA_VERSIONS = {2, 3, 4, 5, 6, 7}
+SUPPORTED_SCHEMA_VERSIONS = {2, 3, 4, 5, 6, 7, 8}
 REQUIRED_SUMMARY_FIELDS = (
     "schemaVersion",
     "sessionId",
@@ -363,6 +364,42 @@ def validate_session(session_path: Path) -> tuple[dict[str, Any], list[str], lis
             f"sampleCount is {expected_count}, but samples.csv contains {row_count} rows"
         )
 
+    csv_integrity_ok: bool | None = None
+    if isinstance(schema_version, int) and schema_version >= 8:
+        stored_byte_length = summary.get("csvByteLength")
+        stored_sha256 = summary.get("csvSha256")
+        if (
+            not isinstance(stored_byte_length, int)
+            or isinstance(stored_byte_length, bool)
+            or stored_byte_length < 0
+        ):
+            errors.append("csvByteLength must be a non-negative integer")
+        if not isinstance(stored_sha256, str) or len(stored_sha256) != 64:
+            errors.append("csvSha256 must be a 64-character lowercase hex string")
+        elif not all(c in "0123456789abcdef" for c in stored_sha256):
+            errors.append("csvSha256 must be a 64-character lowercase hex string")
+        if isinstance(stored_byte_length, int) and isinstance(stored_sha256, str):
+            try:
+                raw = samples_path.read_bytes()
+                actual_byte_length = len(raw)
+                actual_sha256 = hashlib.sha256(raw).hexdigest()
+                if actual_byte_length != stored_byte_length:
+                    errors.append(
+                        f"samples.csv byte length is {actual_byte_length}, "
+                        f"but csvByteLength is {stored_byte_length}"
+                    )
+                if actual_sha256 != stored_sha256:
+                    errors.append(
+                        f"samples.csv SHA-256 mismatch: "
+                        f"stored {stored_sha256}, actual {actual_sha256}"
+                    )
+                csv_integrity_ok = (
+                    actual_byte_length == stored_byte_length
+                    and actual_sha256 == stored_sha256
+                )
+            except OSError as exception:
+                errors.append(f"Cannot read samples.csv for integrity check: {exception}")
+
     report = {
         "sessionDirectory": str(session_directory.resolve()),
         "schemaVersion": schema_version,
@@ -384,6 +421,7 @@ def validate_session(session_path: Path) -> tuple[dict[str, Any], list[str], lis
         "configuration": configuration_report or None,
         "recordingTruncated": recording_truncated,
         "droppedSampleCount": dropped_sample_count,
+        "csvIntegrityOk": csv_integrity_ok,
     }
     return report, errors, warnings
 
@@ -451,6 +489,9 @@ def print_human_report(
                 "Recording: TRUNCATED, "
                 f"{report.get('droppedSampleCount')} samples dropped"
             )
+        if report.get("csvIntegrityOk") is not None:
+            integrity_label = "OK" if report["csvIntegrityOk"] else "FAILED"
+            print(f"Integrity: {integrity_label}")
 
     for warning in warnings:
         print(f"WARNING: {warning}", file=sys.stderr)
