@@ -26,7 +26,8 @@ Hall sensing, production-grade storage, or validated welding tolerances.
   the trigger must be released before the simulation can activate again.
 - Returning from a headset/application pause uses the same trigger-release
   re-arm rule.
-- Completion, mean error, mean speed, and percentage of good samples are shown.
+- Completion, mean error, mean speed, percentage of good samples, attempt time,
+  active welding time, and blocked-trigger time are shown.
 - Each completed, reset, paused, or interrupted attempt is saved locally as a
   JSON summary and CSV sample stream.
 - The B button resets the attempt.
@@ -121,7 +122,8 @@ Session files are written below `Application.persistentDataPath` in
 `samples.csv`. Samples include measured travel/work angles and their configured
 quality state even when angle-based inhibition is disabled. The Unity Console
 prints the exact path after saving. The summary also records tracking
-interruption count and total invalid-tracking time. On Quest,
+interruption count, total invalid-tracking time, attempt duration, active
+welding time, and blocked-trigger time. On Quest,
 retrieve the application files later through USB/ADB; data export is not needed
 for the live demonstration.
 
