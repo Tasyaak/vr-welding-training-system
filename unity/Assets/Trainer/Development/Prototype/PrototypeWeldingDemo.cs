@@ -1,16 +1,19 @@
-using System;
 using UnityEngine;
 using UnityEngine.XR;
 
-#if UNITY_EDITOR
-using UnityEngine.InputSystem;
+#if UNITY_EDITOR && ENABLE_INPUT_SYSTEM
+using Keyboard = UnityEngine.InputSystem.Keyboard;
 #endif
 
 namespace WeldingTrainer.Prototype
 {
     /// <summary>
-    /// Demo-only vertical slice for the presentation prototype.
-    /// It intentionally uses one straight seam and no QR, ESP32, or persistence.
+    /// Demo-only vertical slice for early scene/XR testing.
+    /// It intentionally uses one straight seam and no QR, ESP32, Spatial Anchor,
+    /// persistence, Hall sensor, or production session architecture.
+    ///
+    /// Add this component explicitly to a scene GameObject.
+    /// Assign Tracking Origin to OVRCameraRig/TrackingSpace in the Inspector.
     /// </summary>
     [DefaultExecutionOrder(100)]
     public sealed class PrototypeWeldingDemo : MonoBehaviour
@@ -29,9 +32,11 @@ namespace WeldingTrainer.Prototype
         private static readonly Color BadColour = new Color(1f, 0.12f, 0.08f, 1f);
         private static readonly Color GuideColour = new Color(0.1f, 0.75f, 1f, 1f);
 
+        [Header("Scene references")]
+        [SerializeField] private Transform trackingOrigin;
+        [SerializeField] private Camera xrCamera;
+
         private InputDevice _rightController;
-        private InputDevice _leftController;
-        private Transform _trackingOrigin;
         private Transform _toolTip;
         private LineRenderer _guide;
         private LineRenderer _bead;
@@ -53,16 +58,20 @@ namespace WeldingTrainer.Prototype
         private bool _seamPlaced;
         private bool _completed;
 
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-        private static void AutoStart()
+        private void Awake()
         {
-            if (UnityEngine.Object.FindFirstObjectByType<PrototypeWeldingDemo>() != null)
+            if (xrCamera == null)
             {
-                return;
+                xrCamera = Camera.main;
             }
 
-            var root = new GameObject("Tomorrow Prototype Demo");
-            root.AddComponent<PrototypeWeldingDemo>();
+            // For the standard OVRCameraRig hierarchy, CenterEyeAnchor is a direct
+            // child of TrackingSpace. This is only a convenience fallback.
+            // Prefer assigning TrackingSpace explicitly in the Inspector.
+            if (trackingOrigin == null && xrCamera != null)
+            {
+                trackingOrigin = xrCamera.transform.parent;
+            }
         }
 
         private void Start()
@@ -71,12 +80,18 @@ namespace WeldingTrainer.Prototype
             CreateGuide();
             CreateBead();
             CreateHud();
-            ResolveTrackingOrigin();
+
+            if (trackingOrigin == null)
+            {
+                Debug.LogWarning(
+                    "PrototypeWeldingDemo: Tracking Origin is not assigned. " +
+                    "Assign OVRCameraRig/TrackingSpace in the Inspector for XR controller poses.",
+                    this);
+            }
         }
 
         private void Update()
         {
-            ResolveTrackingOrigin();
             if (!EnsureSeamPlaced())
             {
                 SetHud("Waiting for the XR camera...");
@@ -89,7 +104,7 @@ namespace WeldingTrainer.Prototype
             Vector3 rawToolPosition;
             Quaternion rawToolRotation;
 
-#if UNITY_EDITOR
+#if UNITY_EDITOR && ENABLE_INPUT_SYSTEM
             EnsureDevice(ref _rightController, XRNode.RightHand);
             if (!_rightController.isValid && Keyboard.current != null)
             {
@@ -135,17 +150,17 @@ namespace WeldingTrainer.Prototype
 
         private void LateUpdate()
         {
-            Camera camera = Camera.main;
-            if (camera == null || _hud == null)
+            if (xrCamera == null || _hud == null)
             {
                 return;
             }
 
-            Transform cameraTransform = camera.transform;
+            Transform cameraTransform = xrCamera.transform;
             _hud.transform.position =
                 cameraTransform.position +
                 cameraTransform.forward * 0.65f +
                 cameraTransform.up * 0.22f;
+
             _hud.transform.rotation = Quaternion.LookRotation(
                 _hud.transform.position - cameraTransform.position,
                 cameraTransform.up);
@@ -155,17 +170,20 @@ namespace WeldingTrainer.Prototype
         {
             Vector3 seam = _seamEnd - _seamStart;
             float seamLengthSquared = seam.sqrMagnitude;
+
             float progress = seamLengthSquared > Mathf.Epsilon
                 ? Mathf.Clamp01(Vector3.Dot(_smoothedToolPosition - _seamStart, seam) / seamLengthSquared)
                 : 0f;
+
             Vector3 closestPoint = Vector3.Lerp(_seamStart, _seamEnd, progress);
             float distance = Vector3.Distance(_smoothedToolPosition, closestPoint);
 
             float instantaneousSpeed = 0f;
             if (_hasPreviousPosition && Time.unscaledDeltaTime > Mathf.Epsilon)
             {
-                instantaneousSpeed = Vector3.Distance(_smoothedToolPosition, _previousToolPosition)
-                    / Time.unscaledDeltaTime;
+                instantaneousSpeed =
+                    Vector3.Distance(_smoothedToolPosition, _previousToolPosition) /
+                    Time.unscaledDeltaTime;
             }
 
             float speedBlend = 1f - Mathf.Exp(-SpeedSmoothing * Time.unscaledDeltaTime);
@@ -175,7 +193,10 @@ namespace WeldingTrainer.Prototype
 
             bool positionGood = distance <= GoodDistanceMetres;
             bool positionWeldable = distance <= MaximumWeldDistanceMetres;
-            bool speedGood = _smoothedSpeed >= MinimumGoodSpeed && _smoothedSpeed <= MaximumGoodSpeed;
+            bool speedGood =
+                _smoothedSpeed >= MinimumGoodSpeed &&
+                _smoothedSpeed <= MaximumGoodSpeed;
+
             bool welding = triggerPressed && positionWeldable && !_completed;
 
             Color stateColour = positionGood && speedGood
@@ -183,6 +204,7 @@ namespace WeldingTrainer.Prototype
                 : positionWeldable
                     ? WarningColour
                     : BadColour;
+
             SetToolColour(stateColour);
             SetGuideColour(stateColour);
 
@@ -191,6 +213,7 @@ namespace WeldingTrainer.Prototype
                 _sampleCount++;
                 _errorSum += distance;
                 _speedSum += _smoothedSpeed;
+
                 if (positionGood && speedGood)
                 {
                     _goodSampleCount++;
@@ -225,9 +248,17 @@ namespace WeldingTrainer.Prototype
             {
                 float averageError = _sampleCount > 0 ? _errorSum / _sampleCount : 0f;
                 float averageSpeed = _sampleCount > 0 ? _speedSum / _sampleCount : 0f;
-                float quality = _sampleCount > 0 ? 100f * _goodSampleCount / _sampleCount : 0f;
+                float quality = _sampleCount > 0
+                    ? 100f * _goodSampleCount / _sampleCount
+                    : 0f;
+
                 return string.Format(
-                    "WELD COMPLETE\nCompletion: 100%\nAverage error: {0:0.0} cm\nAverage speed: {1:0.0} cm/s\nGood samples: {2:0}%\nPress B or R to reset",
+                    "WELD COMPLETE\n" +
+                    "Completion: 100%\n" +
+                    "Average error: {0:0.0} cm\n" +
+                    "Average speed: {1:0.0} cm/s\n" +
+                    "Good samples: {2:0}%\n" +
+                    "Press B or R to reset",
                     averageError * 100f,
                     averageSpeed * 100f,
                     quality);
@@ -238,13 +269,17 @@ namespace WeldingTrainer.Prototype
                 : positionWeldable
                     ? "Position: WARNING"
                     : "Position: TOO FAR";
+
             string speedLabel = _smoothedSpeed < MinimumGoodSpeed
                 ? "Speed: TOO SLOW"
                 : _smoothedSpeed > MaximumGoodSpeed
                     ? "Speed: TOO FAST"
                     : "Speed: GOOD";
+
             string activationLabel = triggerPressed
-                ? positionWeldable ? "Laser simulation: ACTIVE" : "Laser simulation: INHIBITED"
+                ? positionWeldable
+                    ? "Laser simulation: ACTIVE"
+                    : "Laser simulation: INHIBITED"
                 : "Hold trigger to weld";
 
             return string.Format(
@@ -264,47 +299,59 @@ namespace WeldingTrainer.Prototype
             out bool resetPressed)
         {
             EnsureDevice(ref _rightController, XRNode.RightHand);
-            EnsureDevice(ref _leftController, XRNode.LeftHand);
 
             bool hasPosition = _rightController.TryGetFeatureValue(
                 CommonUsages.devicePosition,
                 out Vector3 localPosition);
+
             bool hasRotation = _rightController.TryGetFeatureValue(
                 CommonUsages.deviceRotation,
                 out Quaternion localRotation);
 
-            trackingValid = _rightController.isValid && hasPosition && hasRotation;
+            trackingValid =
+                _rightController.isValid &&
+                hasPosition &&
+                hasRotation &&
+                trackingOrigin != null;
+
             if (_rightController.TryGetFeatureValue(CommonUsages.isTracked, out bool isTracked))
             {
                 trackingValid &= isTracked;
             }
 
-            if (_trackingOrigin != null)
+            if (trackingOrigin != null)
             {
-                worldPosition = _trackingOrigin.TransformPoint(localPosition);
-                worldRotation = _trackingOrigin.rotation * localRotation;
+                worldPosition = trackingOrigin.TransformPoint(localPosition);
+                worldRotation = trackingOrigin.rotation * localRotation;
             }
             else
             {
-                worldPosition = localPosition;
-                worldRotation = localRotation;
+                worldPosition = Vector3.zero;
+                worldRotation = Quaternion.identity;
             }
 
             triggerPressed =
-                _rightController.TryGetFeatureValue(CommonUsages.triggerButton, out bool triggerButton)
-                    && triggerButton;
+                _rightController.TryGetFeatureValue(
+                    CommonUsages.triggerButton,
+                    out bool triggerButton) &&
+                triggerButton;
+
             if (!triggerPressed &&
-                _rightController.TryGetFeatureValue(CommonUsages.trigger, out float triggerValue))
+                _rightController.TryGetFeatureValue(
+                    CommonUsages.trigger,
+                    out float triggerValue))
             {
                 triggerPressed = triggerValue >= 0.5f;
             }
 
             resetPressed =
-                _rightController.TryGetFeatureValue(CommonUsages.secondaryButton, out bool secondary)
-                    && secondary;
+                _rightController.TryGetFeatureValue(
+                    CommonUsages.secondaryButton,
+                    out bool secondary) &&
+                secondary;
         }
 
-#if UNITY_EDITOR
+#if UNITY_EDITOR && ENABLE_INPUT_SYSTEM
         private void ReadEditorInput(
             out bool trackingValid,
             out Vector3 worldPosition,
@@ -313,22 +360,40 @@ namespace WeldingTrainer.Prototype
             out bool resetPressed)
         {
             Keyboard keyboard = Keyboard.current;
+            if (keyboard == null)
+            {
+                trackingValid = false;
+                worldPosition = Vector3.zero;
+                worldRotation = Quaternion.identity;
+                triggerPressed = false;
+                resetPressed = false;
+                return;
+            }
+
             float movementSpeed = keyboard.leftShiftKey.isPressed ? 0.35f : 0.12f;
             Vector3 movement = Vector3.zero;
 
-            movement += (keyboard.lKey.isPressed ? Vector3.right : Vector3.zero);
-            movement += (keyboard.jKey.isPressed ? Vector3.left : Vector3.zero);
-            movement += (keyboard.iKey.isPressed ? Vector3.up : Vector3.zero);
-            movement += (keyboard.kKey.isPressed ? Vector3.down : Vector3.zero);
+            movement += keyboard.lKey.isPressed ? Vector3.right : Vector3.zero;
+            movement += keyboard.jKey.isPressed ? Vector3.left : Vector3.zero;
+            movement += keyboard.iKey.isPressed ? Vector3.up : Vector3.zero;
+            movement += keyboard.kKey.isPressed ? Vector3.down : Vector3.zero;
 
-            Camera camera = Camera.main;
-            if (camera != null)
+            if (xrCamera != null)
             {
-                movement += (keyboard.oKey.isPressed ? camera.transform.forward : Vector3.zero);
-                movement -= (keyboard.uKey.isPressed ? camera.transform.forward : Vector3.zero);
+                movement += keyboard.oKey.isPressed
+                    ? xrCamera.transform.forward
+                    : Vector3.zero;
+
+                movement -= keyboard.uKey.isPressed
+                    ? xrCamera.transform.forward
+                    : Vector3.zero;
             }
 
-            _editorToolPosition += movement.normalized * movementSpeed * Time.unscaledDeltaTime;
+            _editorToolPosition +=
+                movement.normalized *
+                movementSpeed *
+                Time.unscaledDeltaTime;
+
             trackingValid = true;
             worldPosition = _editorToolPosition;
             worldRotation = Quaternion.identity;
@@ -344,18 +409,26 @@ namespace WeldingTrainer.Prototype
                 return true;
             }
 
-            Camera camera = Camera.main;
-            if (camera == null || Time.frameCount < 3)
+            if (xrCamera == null)
+            {
+                xrCamera = Camera.main;
+            }
+
+            if (xrCamera == null || Time.frameCount < 3)
             {
                 return false;
             }
 
-            Transform cameraTransform = camera.transform;
+            Transform cameraTransform = xrCamera.transform;
+
             Vector3 centre =
                 cameraTransform.position +
                 cameraTransform.forward * 0.75f -
                 cameraTransform.up * 0.25f;
-            Vector3 direction = Vector3.ProjectOnPlane(cameraTransform.right, Vector3.up).normalized;
+
+            Vector3 direction =
+                Vector3.ProjectOnPlane(cameraTransform.right, Vector3.up).normalized;
+
             if (direction.sqrMagnitude < 0.5f)
             {
                 direction = Vector3.right;
@@ -363,25 +436,16 @@ namespace WeldingTrainer.Prototype
 
             _seamStart = centre - direction * (SeamLengthMetres * 0.5f);
             _seamEnd = centre + direction * (SeamLengthMetres * 0.5f);
+
             _guide.SetPosition(0, _seamStart);
             _guide.SetPosition(1, _seamEnd);
+
             _editorToolPosition = _seamStart + cameraTransform.up * 0.01f;
             _smoothedToolPosition = _editorToolPosition;
+
             _seamPlaced = true;
             UpdateBead();
             return true;
-        }
-
-        private void ResolveTrackingOrigin()
-        {
-            Camera camera = Camera.main;
-            if (camera == null)
-            {
-                return;
-            }
-
-            Transform root = camera.transform.root;
-            _trackingOrigin = root != camera.transform ? root : null;
         }
 
         private static void EnsureDevice(ref InputDevice device, XRNode node)
@@ -412,7 +476,13 @@ namespace WeldingTrainer.Prototype
                 return;
             }
 
-            float amplitude = stateColour == BadColour ? 0.65f : stateColour == WarningColour ? 0.25f : 0f;
+            float amplitude =
+                stateColour == BadColour
+                    ? 0.65f
+                    : stateColour == WarningColour
+                        ? 0.25f
+                        : 0f;
+
             if (amplitude <= 0f)
             {
                 return;
@@ -457,7 +527,13 @@ namespace WeldingTrainer.Prototype
             GameObject hudObject = new GameObject("Prototype HUD");
             hudObject.transform.SetParent(transform, false);
             _hud = hudObject.AddComponent<TextMesh>();
-            _hud.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+
+            Font builtInFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            if (builtInFont != null)
+            {
+                _hud.font = builtInFont;
+            }
+
             _hud.fontSize = 52;
             _hud.characterSize = 0.009f;
             _hud.anchor = TextAnchor.MiddleCenter;
@@ -465,13 +541,22 @@ namespace WeldingTrainer.Prototype
             _hud.color = Color.white;
         }
 
-        private static void ConfigureLineRenderer(LineRenderer line, float width, Color colour)
+        private static void ConfigureLineRenderer(
+            LineRenderer line,
+            float width,
+            Color colour)
         {
             line.useWorldSpace = true;
             line.startWidth = width;
             line.endWidth = width;
             line.numCapVertices = 6;
-            line.material = CreateMaterial(colour);
+
+            Material material = CreateMaterial(colour);
+            if (material != null)
+            {
+                line.material = material;
+            }
+
             line.startColor = colour;
             line.endColor = colour;
         }
@@ -484,6 +569,12 @@ namespace WeldingTrainer.Prototype
                 shader = Shader.Find("Unlit/Color");
             }
 
+            if (shader == null)
+            {
+                Debug.LogError("PrototypeWeldingDemo: no compatible unlit shader was found.");
+                return null;
+            }
+
             Material material = new Material(shader);
             material.color = colour;
             return material;
@@ -491,7 +582,11 @@ namespace WeldingTrainer.Prototype
 
         private void SetToolColour(Color colour)
         {
-            Renderer renderer = _toolTip != null ? _toolTip.GetComponent<Renderer>() : null;
+            Renderer renderer =
+                _toolTip != null
+                    ? _toolTip.GetComponent<Renderer>()
+                    : null;
+
             if (renderer != null)
             {
                 renderer.material.color = colour;
@@ -517,12 +612,15 @@ namespace WeldingTrainer.Prototype
                 {
                     _bead.enabled = false;
                 }
+
                 return;
             }
 
             _bead.enabled = true;
             _bead.SetPosition(0, _seamStart);
-            _bead.SetPosition(1, Vector3.Lerp(_seamStart, _seamEnd, _beadProgress));
+            _bead.SetPosition(
+                1,
+                Vector3.Lerp(_seamStart, _seamEnd, _beadProgress));
         }
 
         private void SetHud(string message)

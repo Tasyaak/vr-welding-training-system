@@ -29,9 +29,8 @@ Use Unity `6000.3.24f1` and open the repository's `unity` directory.
 5. On `OVRManager`, set tracking origin to **Stage**.
 6. Set Passthrough Support to **Supported** or **Required**.
 7. Enable Insight Passthrough.
-8. Add an `OVRPassthroughLayer` component on a persistent empty object and set
-   its placement to **Underlay**.
-9. Set the scene skybox material to None.
+8. Add an `OVRPassthroughLayer` component on a persistent empty object and set its placement to **Underlay**.
+9.  Set the scene skybox material to None.
 10. On `CenterEyeAnchor`, use a solid black background with alpha zero.
 11. Run Meta's Project Setup Tool and fix blocking Android/Quest issues.
 12. Save the scene and commit it together with all generated `.meta` files.
@@ -43,14 +42,14 @@ Do not upgrade packages for the demo.
 
 Press Play. The prototype starts automatically.
 
-| Key | Action |
-| --- | --- |
-| `J` / `L` | Move the simulated tool left/right |
-| `I` / `K` | Move up/down |
-| `U` / `O` | Move away/toward the camera |
-| Left Shift | Move faster |
-| Space | Hold simulated trigger |
-| `R` | Reset attempt |
+| Key        | Action                             |
+| ---------- | ---------------------------------- |
+| `J` / `L`  | Move the simulated tool left/right |
+| `I` / `K`  | Move up/down                       |
+| `U` / `O`  | Move away/toward the camera        |
+| Left Shift | Move faster                        |
+| Space      | Hold simulated trigger             |
+| `R`        | Reset attempt                      |
 
 Expected result: the sphere follows the simulated tool, feedback changes
 between red/yellow/green, holding Space extends the bead, and reaching the end

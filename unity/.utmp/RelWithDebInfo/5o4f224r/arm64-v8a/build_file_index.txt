@@ -1,0 +1,2 @@
+C:\Users\olegk\vr-welding-training-system\unity\Library\Bee\Android\Prj\IL2CPP\Gradle\unityLibrary\src\main\cpp\CMakeLists.txt
+C:\Users\olegk\vr-welding-training-system\unity\Library\Bee\Android\Prj\IL2CPP\Gradle\unityLibrary\src\main\cpp\GameActivity\CMakeLists.txt
