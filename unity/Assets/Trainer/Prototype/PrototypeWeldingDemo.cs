@@ -375,7 +375,11 @@ namespace WeldingTrainer.Prototype
             }
 
             Color stateColour;
-            if (triggerPressed && !activationAllowed)
+            if (_completed)
+            {
+                stateColour = GoodColour;
+            }
+            else if (triggerPressed && !activationAllowed)
             {
                 stateColour = BadColour;
             }
@@ -408,7 +412,7 @@ namespace WeldingTrainer.Prototype
 
             }
 
-            if (triggerPressed)
+            if (triggerPressed && !_completed)
             {
                 SendWarningHaptic(stateColour);
             }
@@ -419,6 +423,9 @@ namespace WeldingTrainer.Prototype
                 _attemptFinishedAt = Time.realtimeSinceStartup;
                 _beadProgress = 1f;
                 UpdateBead();
+                SetToolColour(GoodColour);
+                SetGuideColour(GoodColour);
+                SendCompletionHaptic();
                 FinishRecording(true, "completed");
             }
 
@@ -870,6 +877,17 @@ namespace WeldingTrainer.Prototype
 
             _rightController.SendHapticImpulse(0u, amplitude, 0.04f);
             _nextHapticTime = Time.unscaledTime + 0.12f;
+        }
+
+        private void SendCompletionHaptic()
+        {
+            if (!_rightController.isValid)
+            {
+                return;
+            }
+
+            _rightController.SendHapticImpulse(0u, 0.5f, 0.2f);
+            _nextHapticTime = Time.unscaledTime + 0.25f;
         }
 
         private void HandleTrackingLost()

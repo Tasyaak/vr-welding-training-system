@@ -20,6 +20,8 @@ Hall sensing, production-grade storage, or validated welding tolerances.
   or reversing beyond the small continuity tolerance inhibits activation, so
   skipped regions are not credited.
 - Controller haptics warn about marginal or invalid movement.
+- Successful completion locks the seam green and sends one distinct controller
+  pulse; holding the trigger afterward cannot restart warning feedback.
 - Short generated audio cues announce welding start, inhibition, and completion;
   no external sound assets are required.
 - A dark-backed, head-relative HUD keeps instructions and results readable over
