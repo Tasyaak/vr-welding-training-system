@@ -159,7 +159,7 @@ namespace WeldingTrainer.Prototype
             _hud.transform.position =
                 cameraTransform.position +
                 cameraTransform.forward * 0.65f +
-                cameraTransform.up * 0.22f;
+                cameraTransform.up * 0.15f;
 
             _hud.transform.rotation = Quaternion.LookRotation(
                 _hud.transform.position - cameraTransform.position,
@@ -421,13 +421,19 @@ namespace WeldingTrainer.Prototype
 
             Transform cameraTransform = xrCamera.transform;
 
+            Vector3 horizontalForward = Vector3.ProjectOnPlane(cameraTransform.forward, Vector3.up).normalized;
+
+            if (horizontalForward.sqrMagnitude < 0.01f)
+            {
+                horizontalForward = Vector3.forward;
+            }
+
             Vector3 centre =
                 cameraTransform.position +
-                cameraTransform.forward * 0.75f -
-                cameraTransform.up * 0.25f;
+                horizontalForward * 0.50f -
+                Vector3.up * 0.20f;
 
-            Vector3 direction =
-                Vector3.ProjectOnPlane(cameraTransform.right, Vector3.up).normalized;
+            Vector3 direction = Vector3.ProjectOnPlane(cameraTransform.right, Vector3.up).normalized;
 
             if (direction.sqrMagnitude < 0.5f)
             {

@@ -15,9 +15,6 @@ Hall sensing, persistent logs, or validated welding tolerances.
 - Completion, mean error, mean speed, and percentage of good samples are shown.
 - The B button resets the attempt.
 
-The prototype is automatically created at runtime by
-`PrototypeWeldingDemo.cs`; no instance needs to be placed in the scene.
-
 ## Required Unity setup
 
 Use Unity `6000.3.24f1` and open the repository's `unity` directory.
