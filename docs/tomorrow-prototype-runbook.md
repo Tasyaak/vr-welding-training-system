@@ -26,6 +26,13 @@ Hall sensing, persistent logs, or validated welding tolerances.
 The prototype is automatically created at runtime by
 `PrototypeWeldingDemo.cs`; no instance needs to be placed in the scene.
 
+If the controller represents an attached physical tool, create one scene object
+with a `PrototypeWeldingDemo` component instead of relying on auto-start. Set
+**Controller To Tip Offset** to the measured controller-to-tip vector in metres.
+The same Inspector also exposes demo distance, speed, start, continuity, and
+completion thresholds. These values are demonstration configuration, not
+validated laser-welding requirements.
+
 ## Required Unity setup
 
 Use Unity `6000.3.24f1` and open the repository's `unity` directory.
