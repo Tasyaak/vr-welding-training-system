@@ -24,7 +24,7 @@ CSV_ROWS = (
 
 
 def write_session(
-    directory: Path, sample_count: int = 2, schema_version: int = 6
+    directory: Path, sample_count: int = 2, schema_version: int = 7
 ) -> None:
     summary = {
         "schemaVersion": schema_version,
@@ -70,6 +70,9 @@ def write_session(
             "targetWorkAngleDegrees": 45.0,
             "workAngleToleranceDegrees": 15.0,
         }
+    if schema_version >= 7:
+        summary["recordingTruncated"] = False
+        summary["droppedSampleCount"] = 0
     (directory / "summary.json").write_text(json.dumps(summary), encoding="utf-8")
     (directory / "samples.csv").write_text(CSV_HEADER + CSV_ROWS, encoding="utf-8")
 
@@ -106,7 +109,7 @@ class SessionValidatorTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("Quality in range: 100.0%", result.stdout)
 
-    def test_schema_six_requires_configuration_snapshot(self) -> None:
+    def test_schema_seven_requires_configuration_snapshot(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             session = Path(temporary_directory)
             write_session(session)
@@ -117,7 +120,32 @@ class SessionValidatorTests(unittest.TestCase):
             result = self.run_validator(session)
 
         self.assertEqual(result.returncode, 1)
-        self.assertIn("schema 6 summary is missing configuration", result.stderr)
+        self.assertIn("schema 7 summary is missing configuration", result.stderr)
+
+    def test_truncated_recording_is_reported_as_warning(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            session = Path(temporary_directory)
+            write_session(session)
+            summary_path = session / "summary.json"
+            summary = json.loads(summary_path.read_text(encoding="utf-8"))
+            summary["recordingTruncated"] = True
+            summary["droppedSampleCount"] = 12
+            summary_path.write_text(json.dumps(summary), encoding="utf-8")
+            result = self.run_validator(session)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Recording: TRUNCATED, 12 samples dropped", result.stdout)
+        self.assertIn("Validation: PASSED WITH WARNINGS", result.stdout)
+        self.assertIn("dropped 12 samples", result.stderr)
+
+    def test_partial_summary_is_identified_as_incomplete_save(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            session = Path(temporary_directory)
+            (session / "summary.json.partial").write_text("{}", encoding="utf-8")
+            result = self.run_validator(session)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(".partial summary exists", result.stderr)
 
     def test_sample_count_mismatch_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:

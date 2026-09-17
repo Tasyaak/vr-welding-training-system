@@ -37,6 +37,8 @@ Hall sensing, production-grade storage, or validated welding tolerances.
   time, and blocked-trigger time are shown.
 - Each completed, reset, paused, or interrupted attempt is saved locally as a
   JSON summary and CSV sample stream.
+- Session files are first written with `.partial` suffixes and promoted only
+  after successful writes; `summary.json` is committed last.
 - The B button resets the attempt.
 
 The prototype is automatically created at runtime by
@@ -142,6 +144,11 @@ offset, distance/speed/progress thresholds, and orientation settings used for
 that attempt. On Quest,
 retrieve the application files later through USB/ADB; data export is not needed
 for the live demonstration.
+
+Schema v7 also reports whether the bounded recorder reached its sample limit
+and how many later samples were dropped. A truncated recording remains visible
+and analyzable, but the HUD and offline validator warn that its evidence is
+incomplete.
 
 ### Validate an exported session
 

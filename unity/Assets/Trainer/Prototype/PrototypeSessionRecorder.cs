@@ -19,18 +19,22 @@ namespace WeldingTrainer.Prototype
         private string _sessionId;
         private string _startedUtc;
         private ConfigurationSnapshot _configuration;
+        private int _droppedSampleCount;
 
         public bool IsActive { get; private set; }
         public string LastSavedDirectory { get; private set; }
         public string CurrentSessionId => _sessionId;
+        public bool LastRecordingTruncated { get; private set; }
 
         public void Begin(ConfigurationSnapshot configuration)
         {
             _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
             _samples.Clear();
+            _droppedSampleCount = 0;
             _sessionId = Guid.NewGuid().ToString("N");
             _startedUtc = DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture);
             LastSavedDirectory = string.Empty;
+            LastRecordingTruncated = false;
             IsActive = true;
         }
 
@@ -46,8 +50,13 @@ namespace WeldingTrainer.Prototype
             bool triggerPressed,
             bool weldingAllowed)
         {
-            if (!IsActive || _samples.Count >= MaximumSamples)
+            if (!IsActive)
             {
+                return;
+            }
+            if (_samples.Count >= MaximumSamples)
+            {
+                _droppedSampleCount++;
                 return;
             }
 
@@ -93,7 +102,7 @@ namespace WeldingTrainer.Prototype
 
             var summary = new SummaryRecord
             {
-                schemaVersion = 6,
+                schemaVersion = 7,
                 sessionId = _sessionId,
                 startedUtc = _startedUtc,
                 finishedUtc = DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture),
@@ -109,23 +118,40 @@ namespace WeldingTrainer.Prototype
                 weldingActiveSeconds = weldingActiveSeconds,
                 blockedTriggerSeconds = blockedTriggerSeconds,
                 configuration = _configuration,
+                recordingTruncated = _droppedSampleCount > 0,
+                droppedSampleCount = _droppedSampleCount,
                 sampleCount = _samples.Count
             };
 
-            File.WriteAllText(
-                Path.Combine(sessionDirectory, "summary.json"),
-                JsonUtility.ToJson(summary, true),
-                Encoding.UTF8);
-            WriteSamples(Path.Combine(sessionDirectory, "samples.csv"));
+            string samplesPath = Path.Combine(sessionDirectory, "samples.csv");
+            string samplesPartialPath = samplesPath + ".partial";
+            string summaryPath = Path.Combine(sessionDirectory, "summary.json");
+            string summaryPartialPath = summaryPath + ".partial";
+
+            WriteSamples(samplesPartialPath);
+            WriteText(summaryPartialPath, JsonUtility.ToJson(summary, true));
+            File.Move(samplesPartialPath, samplesPath);
+            File.Move(summaryPartialPath, summaryPath);
 
             LastSavedDirectory = sessionDirectory;
+            LastRecordingTruncated = _droppedSampleCount > 0;
             Debug.Log($"Prototype session saved to: {sessionDirectory}");
             return sessionDirectory;
         }
 
+        private static void WriteText(string path, string contents)
+        {
+            using var stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None);
+            using var writer = new StreamWriter(stream, new UTF8Encoding(false));
+            writer.Write(contents);
+            writer.Flush();
+            stream.Flush();
+        }
+
         private void WriteSamples(string path)
         {
-            using var writer = new StreamWriter(path, false, new UTF8Encoding(false));
+            using var stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None);
+            using var writer = new StreamWriter(stream, new UTF8Encoding(false));
             writer.WriteLine(
                 "elapsed_s,tool_x_m,tool_y_m,tool_z_m,seam_progress,distance_m,speed_mps,travel_angle_deg,work_angle_deg,orientation_good,trigger,welding_allowed");
 
@@ -155,6 +181,8 @@ namespace WeldingTrainer.Prototype
                 writer.Write(',');
                 writer.WriteLine(sample.weldingAllowed ? "1" : "0");
             }
+            writer.Flush();
+            stream.Flush();
         }
 
         [Serializable]
@@ -203,6 +231,8 @@ namespace WeldingTrainer.Prototype
             public float weldingActiveSeconds;
             public float blockedTriggerSeconds;
             public ConfigurationSnapshot configuration;
+            public bool recordingTruncated;
+            public int droppedSampleCount;
             public int sampleCount;
         }
 

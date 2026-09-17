@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 
-SUPPORTED_SCHEMA_VERSIONS = {2, 3, 4, 5, 6}
+SUPPORTED_SCHEMA_VERSIONS = {2, 3, 4, 5, 6, 7}
 REQUIRED_SUMMARY_FIELDS = (
     "schemaVersion",
     "sessionId",
@@ -69,9 +69,19 @@ def validate_session(session_path: Path) -> tuple[dict[str, Any], list[str], lis
     warnings: list[str] = []
 
     if not summary_path.is_file():
-        return {}, [f"Missing summary file: {summary_path}"], warnings
+        partial_note = (
+            "; a .partial summary exists, so saving did not complete"
+            if (session_directory / "summary.json.partial").exists()
+            else ""
+        )
+        return {}, [f"Missing summary file: {summary_path}{partial_note}"], warnings
     if not samples_path.is_file():
-        return {}, [f"Missing sample file: {samples_path}"], warnings
+        partial_note = (
+            "; a .partial sample file exists, so saving did not complete"
+            if (session_directory / "samples.csv.partial").exists()
+            else ""
+        )
+        return {}, [f"Missing sample file: {samples_path}{partial_note}"], warnings
 
     try:
         summary = json.loads(summary_path.read_text(encoding="utf-8-sig"))
@@ -119,6 +129,27 @@ def validate_session(session_path: Path) -> tuple[dict[str, Any], list[str], lis
     )
     if quality_field not in summary:
         errors.append(f"schema {schema_version} summary is missing {quality_field}")
+
+    recording_truncated = summary.get("recordingTruncated")
+    dropped_sample_count = summary.get("droppedSampleCount")
+    if isinstance(schema_version, int) and schema_version >= 7:
+        if not isinstance(recording_truncated, bool):
+            errors.append("recordingTruncated must be a boolean")
+        if (
+            not isinstance(dropped_sample_count, int)
+            or isinstance(dropped_sample_count, bool)
+            or dropped_sample_count < 0
+        ):
+            errors.append("droppedSampleCount must be a non-negative integer")
+        if isinstance(recording_truncated, bool) and isinstance(dropped_sample_count, int):
+            if recording_truncated != (dropped_sample_count > 0):
+                errors.append(
+                    "recordingTruncated must agree with whether droppedSampleCount is nonzero"
+                )
+            elif recording_truncated:
+                warnings.append(
+                    f"Recording reached its capacity and dropped {dropped_sample_count} samples"
+                )
 
     configuration = summary.get("configuration")
     configuration_report: dict[str, Any] = {}
@@ -351,6 +382,8 @@ def validate_session(session_path: Path) -> tuple[dict[str, Any], list[str], lis
         "trackingInterruptionCount": tracking_interruptions,
         "invalidTrackingSeconds": optional_numbers["invalidTrackingSeconds"],
         "configuration": configuration_report or None,
+        "recordingTruncated": recording_truncated,
+        "droppedSampleCount": dropped_sample_count,
     }
     return report, errors, warnings
 
@@ -413,12 +446,18 @@ def print_human_report(
                 f"Unity {configuration.get('unityVersion')}, "
                 f"{configuration.get('runtimePlatform')}"
             )
+        if report.get("recordingTruncated"):
+            print(
+                "Recording: TRUNCATED, "
+                f"{report.get('droppedSampleCount')} samples dropped"
+            )
 
     for warning in warnings:
         print(f"WARNING: {warning}", file=sys.stderr)
     for error in errors:
         print(f"ERROR: {error}", file=sys.stderr)
-    print("Validation: " + ("FAILED" if errors else "PASSED"))
+    validation_status = "FAILED" if errors else "PASSED WITH WARNINGS" if warnings else "PASSED"
+    print("Validation: " + validation_status)
 
 
 def main() -> int:
