@@ -13,6 +13,8 @@ Hall sensing, persistent logs, or validated welding tolerances.
   remains within 5 cm of the seam.
 - Controller haptics warn about marginal or invalid movement.
 - Completion, mean error, mean speed, and percentage of good samples are shown.
+- Each completed, reset, paused, or interrupted attempt is saved locally as a
+  JSON summary and CSV sample stream.
 - The B button resets the attempt.
 
 The prototype is automatically created at runtime by
@@ -65,6 +67,12 @@ shows the result summary.
 4. Confirm passthrough is visible and the HUD is readable.
 5. Move the right controller near the seam and hold its trigger.
 6. Verify position/speed feedback, haptics, bead progress, completion, and reset.
+
+Session files are written below `Application.persistentDataPath` in
+`PrototypeSessions/<session-id>/`. Each directory contains `summary.json` and
+`samples.csv`. The Unity Console prints the exact path after saving. On Quest,
+retrieve the application files later through USB/ADB; data export is not needed
+for the live demonstration.
 
 If controller-to-tip placement is visibly wrong, record the symptom and adjust
 the prototype only enough for the presentation. The final project will use a
