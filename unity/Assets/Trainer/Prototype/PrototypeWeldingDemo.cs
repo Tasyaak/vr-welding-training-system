@@ -15,19 +15,27 @@ namespace WeldingTrainer.Prototype
     [DefaultExecutionOrder(100)]
     public sealed class PrototypeWeldingDemo : MonoBehaviour
     {
-        private const float SeamLengthMetres = 0.5f;
-        private const float GoodDistanceMetres = 0.025f;
-        private const float MaximumWeldDistanceMetres = 0.05f;
-        private const float MinimumGoodSpeed = 0.05f;
-        private const float MaximumGoodSpeed = 0.15f;
-        private const float CompletionThreshold = 0.97f;
-        private const float StartProgressThreshold = 0.08f;
-        private const float MaximumProgressJump = 0.08f;
-        private const float ReverseProgressTolerance = 0.03f;
-        private const float MinimumCalibrationLength = 0.15f;
-        private const float MaximumCalibrationLength = 1.5f;
         private const float PositionSmoothing = 16f;
         private const float SpeedSmoothing = 10f;
+
+        [Header("Controller attachment")]
+        [Tooltip("Welding tip position relative to the tracked right-controller pose, in metres.")]
+        [SerializeField] private Vector3 controllerToTipOffset = Vector3.zero;
+
+        [Header("Demo seam")]
+        [SerializeField, Min(0.15f)] private float defaultSeamLengthMetres = 0.5f;
+        [SerializeField, Min(0.01f)] private float minimumCalibrationLength = 0.15f;
+        [SerializeField, Min(0.15f)] private float maximumCalibrationLength = 1.5f;
+
+        [Header("Demo tolerances - not validated welding requirements")]
+        [SerializeField, Min(0.001f)] private float goodDistanceMetres = 0.025f;
+        [SerializeField, Min(0.001f)] private float maximumWeldDistanceMetres = 0.05f;
+        [SerializeField, Min(0f)] private float minimumGoodSpeed = 0.05f;
+        [SerializeField, Min(0.01f)] private float maximumGoodSpeed = 0.15f;
+        [SerializeField, Range(0.8f, 1f)] private float completionThreshold = 0.97f;
+        [SerializeField, Range(0.01f, 0.25f)] private float startProgressThreshold = 0.08f;
+        [SerializeField, Range(0.01f, 0.25f)] private float maximumProgressJump = 0.08f;
+        [SerializeField, Range(0f, 0.25f)] private float reverseProgressTolerance = 0.03f;
 
         private static readonly Color GoodColour = new Color(0.1f, 1f, 0.25f, 1f);
         private static readonly Color WarningColour = new Color(1f, 0.75f, 0.05f, 1f);
@@ -87,12 +95,31 @@ namespace WeldingTrainer.Prototype
 
         private void Start()
         {
+            ClampSettings();
             _recorder = new PrototypeSessionRecorder();
             CreateToolTip();
             CreateGuide();
             CreateBead();
             CreateHud();
             ResolveTrackingOrigin();
+        }
+
+        private void OnValidate()
+        {
+            ClampSettings();
+        }
+
+        private void ClampSettings()
+        {
+            defaultSeamLengthMetres = Mathf.Max(0.15f, defaultSeamLengthMetres);
+            minimumCalibrationLength = Mathf.Max(0.01f, minimumCalibrationLength);
+            maximumCalibrationLength = Mathf.Max(
+                minimumCalibrationLength,
+                maximumCalibrationLength);
+            goodDistanceMetres = Mathf.Max(0.001f, goodDistanceMetres);
+            maximumWeldDistanceMetres = Mathf.Max(goodDistanceMetres, maximumWeldDistanceMetres);
+            minimumGoodSpeed = Mathf.Max(0f, minimumGoodSpeed);
+            maximumGoodSpeed = Mathf.Max(minimumGoodSpeed, maximumGoodSpeed);
         }
 
         private void Update()
@@ -215,10 +242,10 @@ namespace WeldingTrainer.Prototype
             _previousToolPosition = _smoothedToolPosition;
             _hasPreviousPosition = true;
 
-            bool positionGood = distance <= GoodDistanceMetres;
-            bool positionWeldable = distance <= MaximumWeldDistanceMetres;
-            bool speedGood = _smoothedSpeed >= MinimumGoodSpeed && _smoothedSpeed <= MaximumGoodSpeed;
-            bool nearStart = progress <= StartProgressThreshold;
+            bool positionGood = distance <= goodDistanceMetres;
+            bool positionWeldable = distance <= maximumWeldDistanceMetres;
+            bool speedGood = _smoothedSpeed >= minimumGoodSpeed && _smoothedSpeed <= maximumGoodSpeed;
+            bool nearStart = progress <= startProgressThreshold;
 
             if (!_attemptStarted && triggerPressed && positionWeldable && nearStart)
             {
@@ -226,8 +253,8 @@ namespace WeldingTrainer.Prototype
             }
 
             bool progressContinuous =
-                progress <= _beadProgress + MaximumProgressJump &&
-                progress >= _beadProgress - ReverseProgressTolerance;
+                progress <= _beadProgress + maximumProgressJump &&
+                progress >= _beadProgress - reverseProgressTolerance;
             bool activationAllowed =
                 _attemptStarted &&
                 positionWeldable &&
@@ -285,7 +312,7 @@ namespace WeldingTrainer.Prototype
                 SendWarningHaptic(stateColour);
             }
 
-            if (!_completed && _beadProgress >= CompletionThreshold)
+            if (!_completed && _beadProgress >= completionThreshold)
             {
                 _completed = true;
                 _beadProgress = 1f;
@@ -326,14 +353,14 @@ namespace WeldingTrainer.Prototype
                     saveStatus);
             }
 
-            string positionLabel = distance <= GoodDistanceMetres
+            string positionLabel = distance <= goodDistanceMetres
                 ? "Position: GOOD"
                 : positionWeldable
                     ? "Position: WARNING"
                     : "Position: TOO FAR";
-            string speedLabel = _smoothedSpeed < MinimumGoodSpeed
+            string speedLabel = _smoothedSpeed < minimumGoodSpeed
                 ? "Speed: TOO SLOW"
-                : _smoothedSpeed > MaximumGoodSpeed
+                : _smoothedSpeed > maximumGoodSpeed
                     ? "Speed: TOO FAST"
                     : "Speed: GOOD";
             string activationLabel;
@@ -401,6 +428,8 @@ namespace WeldingTrainer.Prototype
                 worldPosition = localPosition;
                 worldRotation = localRotation;
             }
+
+            worldPosition += worldRotation * controllerToTipOffset;
 
             triggerPressed =
                 _rightController.TryGetFeatureValue(CommonUsages.triggerButton, out bool triggerButton)
@@ -522,8 +551,8 @@ namespace WeldingTrainer.Prototype
                 direction = Vector3.right;
             }
 
-            _seamStart = centre - direction * (SeamLengthMetres * 0.5f);
-            _seamEnd = centre + direction * (SeamLengthMetres * 0.5f);
+            _seamStart = centre - direction * (defaultSeamLengthMetres * 0.5f);
+            _seamEnd = centre + direction * (defaultSeamLengthMetres * 0.5f);
             _guide.SetPosition(0, _seamStart);
             _guide.SetPosition(1, _seamEnd);
             _editorToolPosition = _seamStart + cameraTransform.up * 0.01f;
@@ -590,17 +619,17 @@ namespace WeldingTrainer.Prototype
             }
 
             float length = Vector3.Distance(_calibrationStart, toolPosition);
-            if (length < MinimumCalibrationLength)
+            if (length < minimumCalibrationLength)
             {
                 _calibrationMessage =
-                    "SEAM PLACEMENT\nEnd is too close to start\nUse at least 15 cm\nand press A or C again";
+                    $"SEAM PLACEMENT\nEnd is too close to start\nUse at least {minimumCalibrationLength * 100f:0} cm\nand press A or C again";
                 return;
             }
 
-            if (length > MaximumCalibrationLength)
+            if (length > maximumCalibrationLength)
             {
                 _calibrationMessage =
-                    "SEAM PLACEMENT\nEnd is too far from start\nUse less than 1.5 m\nand press A or C again";
+                    $"SEAM PLACEMENT\nEnd is too far from start\nUse less than {maximumCalibrationLength:0.0} m\nand press A or C again";
                 return;
             }
 
