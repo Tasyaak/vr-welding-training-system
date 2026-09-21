@@ -5,9 +5,12 @@ EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Scenes:
-  - enabled: 1
+  - enabled: 0
     path: Assets/Trainer/Scenes/Bootstrap.unity
-    guid: 4f159b8fdff4354cc08d98b7e73f495006710cd9
+    guid: 0c2ab989c5fa93a46b8b251c87d896c9
+  - enabled: 1
+    path: Assets/Trainer/Scenes/FusionQuest.unity
+    guid: d8d2d1f06f7a670959ad7641892e2dc3
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
     com.unity.xr.management.loader_settings: {fileID: 11400000, guid: 597526b3875292549887373a6583b1b1, type: 2}

@@ -11,11 +11,12 @@
 /unity/.vs/
 /unity/.vscode/
 /unity/.idea/
+/unity/.utmp/
+/unity/Assets/Trainer/Development/FusionDemo/Generated/
 /unity/*.csproj
 /unity/*.sln
 /unity/*.slnx
 /unity/*.user
-/unity/.utmp/
 
 # Arduino / ESP32 local configuration
 /firmware/**/secrets.h
