@@ -147,3 +147,7 @@ The staged implementation plan is documented in
 
 The temporary presentation prototype and its Unity/Quest test procedure are
 documented in **[`docs/tomorrow-prototype-runbook.md`](docs/tomorrow-prototype-runbook.md)**.
+
+The Fusion presentation demo (one-metre angle workpiece, sparks, cooling metal,
+and welding from any point) has a detailed Russian Unity setup guide:
+**[`docs/fusion-demo-unity-guide.md`](docs/fusion-demo-unity-guide.md)**.

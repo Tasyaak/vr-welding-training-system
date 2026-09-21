@@ -15,6 +15,7 @@
 /unity/*.sln
 /unity/*.slnx
 /unity/*.user
+/unity/.utmp/
 
 # Arduino / ESP32 local configuration
 /firmware/**/secrets.h
