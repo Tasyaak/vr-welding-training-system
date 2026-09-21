@@ -20,6 +20,8 @@ namespace WeldingTrainer.FusionDemo
         private MaterialPropertyBlock properties;
         private MeshRenderer beadRenderer;
         private bool dirty;
+        private bool topologyDirty;
+        private bool[] burned;
         private float depositTime;
         private System.Action<int, bool> touchCell;
         public SeamCoverage Coverage { get; private set; }
@@ -27,6 +29,7 @@ namespace WeldingTrainer.FusionDemo
         private void Awake()
         {
             Coverage = new SeamCoverage(Length, Mathf.Clamp(cells, 100, 1000));
+            burned = new bool[Coverage.Count];
             var vertices = new Vector3[Coverage.Count * VerticesPerCell];
             times = new Vector2[vertices.Length];
             triangles = new List<int>(Coverage.Count * (Profile - 1) * 6);
@@ -71,10 +74,24 @@ namespace WeldingTrainer.FusionDemo
 
         private void TouchCell(int cell, bool fresh)
         {
+            if (burned[cell]) return;
             if (fresh) AddFaces(cell);
             int start = cell * VerticesPerCell;
             for (int i = start; i < start + VerticesPerCell; i++)
                 times[i] = new Vector2(depositTime, fresh ? depositTime : times[i].y);
+        }
+
+        public void DepositCell(int cell)
+        {
+            float centre = (cell + 0.5f) * Coverage.CellLength;
+            Deposit(centre, centre);
+        }
+
+        public void BurnCell(int cell)
+        {
+            if (burned[cell]) return;
+            burned[cell] = true;
+            topologyDirty = dirty = true;
         }
 
         private void AddFaces(int cell)
@@ -94,6 +111,13 @@ namespace WeldingTrainer.FusionDemo
             properties.SetFloat("_DemoTime", Time.timeSinceLevelLoad);
             beadRenderer.SetPropertyBlock(properties);
             if (!dirty) return;
+            if (topologyDirty)
+            {
+                triangles.Clear();
+                for (int c = 0; c < Coverage.Count; c++)
+                    if (Coverage[c] && !burned[c]) AddFaces(c);
+                topologyDirty = false;
+            }
             mesh.uv2 = times;
             mesh.SetTriangles(triangles, 0, false);
             dirty = false;
@@ -102,6 +126,8 @@ namespace WeldingTrainer.FusionDemo
         public void ResetBead()
         {
             Coverage.Clear();
+            System.Array.Clear(burned, 0, burned.Length);
+            topologyDirty = false;
             triangles.Clear();
             dirty = true;
         }

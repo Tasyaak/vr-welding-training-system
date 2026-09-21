@@ -23,7 +23,8 @@ namespace WeldingTrainer.FusionDemo.Editor
         {
             CreateDesktop(true);
             CheckCoverage();
-            foreach (string shaderName in new[] { "WeldingTrainer/Fusion Metal", "WeldingTrainer/Fusion Spark" })
+            FusionThermalChecks.Run();
+            foreach (string shaderName in new[] { "WeldingTrainer/Fusion Metal", "WeldingTrainer/Fusion Spark", "WeldingTrainer/Fusion Workpiece", "WeldingTrainer/Fusion Graph" })
             {
                 Shader shader = Shader.Find(shaderName);
                 if (shader == null || ShaderUtil.ShaderHasError(shader))
@@ -53,6 +54,10 @@ namespace WeldingTrainer.FusionDemo.Editor
             key.intensity = 2;
             key.transform.rotation = Quaternion.Euler(45, -30, 0);
             var demo = CreateDemo();
+            demo.penetrationGraphOffset = new Vector3(0.92f, -0.32f, -0.2f);
+            demo.penetrationGraphSize = new Vector2(0.5f, 0.16f);
+            camera.transform.position = new Vector3(0.2f, 1.6f, -1.65f);
+            camera.transform.LookAt(new Vector3(0.18f, 1.08f, 0));
             Material table = MaterialAsset("Table", "Universal Render Pipeline/Lit", new Color(0.065f, 0.09f, 0.13f));
             Cube("Presentation plinth", null, new Vector3(0, 0.85f, 0), new Vector3(1.25f, 0.09f, 0.4f), table);
             string path = AssetDatabase.GenerateUniqueAssetPath(Folder + "/FusionPresentation.unity");
@@ -132,7 +137,7 @@ namespace WeldingTrainer.FusionDemo.Editor
             hud.characterSize = 0.006f;
             hud.anchor = TextAnchor.MiddleCenter;
             hud.alignment = TextAlignment.Center;
-            hud.text = "FUSION / 1 METRE\nStart anywhere on the seam";
+            hud.text = "FUSION / 1 METRE\nStart at either end";
             demo.statusText = hud;
             return demo;
         }

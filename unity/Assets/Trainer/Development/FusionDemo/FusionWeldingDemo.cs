@@ -42,6 +42,7 @@ namespace WeldingTrainer.FusionDemo
         private bool focused = true;
         private bool suspended;
         private bool rehearsing;
+        private bool overheatRehearsal;
         private float rehearsalStart;
         private float nextHudUpdate;
         private string status = "Ready";
@@ -108,32 +109,42 @@ namespace WeldingTrainer.FusionDemo
         [Tooltip("Right thumbstick up/down changes power by one step per deflection. Disable when a virtual menu owns power control.")]
         public bool enableXrPowerThumbstick = true;
 
-        [Tooltip("Plate/flange thickness used only as the upper limit of the presentation penetration model.")]
+        [Tooltip("Plate thickness in mm: full penetration is separate from subsequent burn-through.")]
         [Min(0.1f)]
         public float materialThicknessMm = 6f;
 
-        [Tooltip("Calibration point: penetration at Reference Power and Reference Speed. Replace with measured data for the actual material/optics.")]
+        [Tooltip("Depth after Formation Dose + Reference Exposure equivalent seconds at reference power.")]
         [Min(0.01f)]
         public float referencePenetrationMm = 3f;
 
         [Min(1f)]
         public float referencePowerWatts = 1500f;
 
-        [Tooltip("Calibration speed in metres per second.")]
+        [Tooltip("Legacy presentation speed. Used for movement statistics only, never for penetration.")]
         [Min(0.001f)]
         public float referenceTravelSpeedMps = 0.08f;
 
-        [Tooltip("Exponent of line-energy scaling. 1 = penetration proportional to P/v. Fit this from experiments if quantitative accuracy is required.")]
+        [Tooltip("Exponent of accumulated thermal dose to penetration depth (presentation model).")]
         [Range(0.1f, 2f)]
         public float penetrationEnergyExponent = 1f;
 
-        [Tooltip("Lower speed clamp for the model, preventing infinite depth when the hand is almost stationary.")]
+        [Tooltip("Legacy serialized setting; no longer used in penetration or speed calculation.")]
         [Min(0.001f)]
         public float minimumModelSpeedMps = 0.01f;
 
         [Tooltip("Smoothing rate for hand-speed measurements. Higher values react faster.")]
         [Range(0.5f, 30f)]
         public float speedSmoothing = 8f;
+
+        [Header("Cell heating and burn-through (presentation model)")]
+        [Min(0.001f)] public float heatedFootprintMetres = 0.024f;
+        [Min(0.01f)] public float formationDoseSeconds = 0.12f;
+        [Min(0.01f)] public float referenceExposureSeconds = 0.18f;
+        [Min(0.01f)] public float thermalCoolingSeconds = 2f;
+        [Range(0.5f, 0.99f)] public float burnWarningFraction = 0.85f;
+        [Min(0.05f)] public float burnThroughExtraDoseSeconds = 0.35f;
+        [Tooltip("Optional flange renderers. Empty = mesh renderers under Workpiece, excluding the bead.")]
+        public Renderer[] burnThroughSurfaces;
 
         [Header("Penetration graph")]
         public bool showPenetrationGraph = true;
@@ -183,6 +194,16 @@ namespace WeldingTrainer.FusionDemo
         private bool waitForTriggerRelease;
         private string completedSummary = string.Empty;
 
+        private SeamThermalModel thermal;
+        private FusionBurnThroughVisual burnVisual;
+        private float lastThermalTime;
+        private float currentMetres;
+        private int warningCells;
+        private Mesh graphBars;
+        private Vector3[] graphVertices;
+        private Color[] graphColors;
+        private LineRenderer warningThresholdLine;
+        private TextMesh graphLegend;
         private float[] penetrationByCellMm;
         private float filteredTravelSpeedMps;
         private float currentPenetrationMm;
@@ -316,19 +337,17 @@ namespace WeldingTrainer.FusionDemo
                 distance <= maximumDistance;
 
             float metres = z + 0.5f;
-            bool startedThisFrame = false;
+
 
             if (attemptState == AttemptState.Ready && weldingCandidate)
             {
                 if (IsAtLeftEnd(metres))
                 {
                     BeginAttempt(StartSide.Left);
-                    startedThisFrame = true;
                 }
                 else if (IsAtRightEnd(metres))
                 {
                     BeginAttempt(StartSide.Right);
-                    startedThisFrame = true;
                 }
                 else
                 {
@@ -337,6 +356,7 @@ namespace WeldingTrainer.FusionDemo
                 }
             }
 
+            currentMetres = metres;
             bool welding =
                 attemptState == AttemptState.Welding &&
                 weldingCandidate;
@@ -348,25 +368,9 @@ namespace WeldingTrainer.FusionDemo
                     Time.time - previousTime <= maximumSampleGap &&
                     Vector3.Distance(tipLocal, previousLocalTip) <= maximumBridgeDistance;
 
-                // Snap only the accepted end-tolerance region to the mathematical seam ends.
-                // Without this, a valid start e.g. 20 mm from the end can never reach 100%
-                // coverage because the first cells remain untouched.
-                float depositFrom = continuous ? previousMetres : metres;
-                float depositTo = metres;
-
-                if (startedThisFrame)
-                    depositFrom = startSide == StartSide.Left ? 0f : FusionBead.Length;
-
-                if (startSide == StartSide.Left && IsAtRightEnd(metres))
-                    depositTo = FusionBead.Length;
-                else if (startSide == StartSide.Right && IsAtLeftEnd(metres))
-                    depositTo = 0f;
-
-                bead.Deposit(depositFrom, depositTo);
-
-                float sampleSpeed = GetWeldingTravelSpeedMps(continuous, metres);
-                currentPenetrationMm = CalculatePenetrationMm(laserPowerWatts, sampleSpeed);
-                RecordPenetration(depositFrom, depositTo, currentPenetrationMm);
+                // Heat only physically visited cells. Never snap thermal exposure to an end.
+                GetWeldingTravelSpeedMps(continuous, metres); // display/statistics only
+                AdvanceThermal(true, continuous ? previousMetres : metres, metres);
                 powerTimeIntegral += laserPowerWatts * Time.deltaTime;
 
                 arcOnTime += Time.deltaTime;
@@ -383,6 +387,8 @@ namespace WeldingTrainer.FusionDemo
                     return;
                 }
             }
+
+            if (!welding) AdvanceThermal(false, metres, metres);
 
             if (attemptState == AttemptState.Welding &&
                 previousWelding &&
@@ -509,7 +515,7 @@ namespace WeldingTrainer.FusionDemo
 
                 return;
             }
-        #if ENABLE_INPUT_SYSTEM
+#if ENABLE_INPUT_SYSTEM
             var keyboard = Keyboard.current;
             if (keyboard == null) { valid = false; return; }
             if (keyboard.upArrowKey.wasPressedThisFrame) AdjustLaserPower(laserPowerStepWatts);
@@ -525,9 +531,9 @@ namespace WeldingTrainer.FusionDemo
             desktopTip += Vector3.ClampMagnitude(movement, 1) * speed * Time.deltaTime;
             desktopTip = Vector3.Max(new Vector3(-0.06f, -0.06f, -0.6f), Vector3.Min(desktopTip, new Vector3(0.2f, 0.2f, 0.6f)));
             world = workpiece.TransformPoint(desktopTip);
-        #else
+#else
             valid = false;
-        #endif
+#endif
         }
 
         public void ToggleRehearsal()
@@ -539,6 +545,7 @@ namespace WeldingTrainer.FusionDemo
             ResetAttempt();
 
             rehearsing = start;
+            overheatRehearsal = false;
             waitForTriggerRelease = false;
             rehearsalStart = Time.time;
         }
@@ -550,6 +557,21 @@ namespace WeldingTrainer.FusionDemo
             out bool valid)
         {
             float t = Time.time - rehearsalStart;
+
+            if (overheatRehearsal)
+            {
+                // Start legally at an end, lift, then dwell at the centre so the hole
+                // is surrounded by metal and is visible after the tip moves away.
+                float centreZ = t < 0.25f ? -0.5f : Mathf.Lerp(-0.5f, 0, (t - 0.25f) / 0.5f);
+                trigger = t < 0.25f || (t >= 0.75f && t < 3.75f);
+                var tip = new Vector3(0.007f, 0.007f, centreZ);
+                if (!trigger) tip += new Vector3(0.08f, 0.08f, 0);
+                world = workpiece.TransformPoint(tip);
+                rotation = workpiece.rotation * Quaternion.LookRotation(new Vector3(-1, -1, 0));
+                valid = true;
+                if (t >= 4) { rehearsing = false; desktopTip = tip; }
+                return;
+            }
 
             // The attempt rules require a weld to begin at one end.
             // Presentation therefore performs one valid LEFT -> RIGHT pass.
@@ -576,6 +598,7 @@ namespace WeldingTrainer.FusionDemo
         public void ResetAttempt()
         {
             rehearsing = false;
+            overheatRehearsal = false;
             previousWelding = false;
 
             attemptState = AttemptState.Ready;
@@ -590,22 +613,20 @@ namespace WeldingTrainer.FusionDemo
             interruptions = 0;
             completedSummary = string.Empty;
             currentPenetrationMm = 0f;
-            filteredTravelSpeedMps = referenceTravelSpeedMps;
+            filteredTravelSpeedMps = 0f;
             powerTimeIntegral = 0f;
 
-            if (penetrationByCellMm != null)
-            {
-                for (int i = 0; i < penetrationByCellMm.Length; i++)
-                    penetrationByCellMm[i] = 0f;
-            }
-
+            thermal?.Clear();
+            lastThermalTime = Time.time;
+            warningCells = 0;
+            bead.ResetBead();
+            if (thermal != null) burnVisual?.Refresh(thermal);
             UpdatePenetrationGraph(true);
 
             waitForTriggerRelease = true;
 
             desktopTip = new Vector3(0.007f, 0.007f, 0);
 
-            bead.ResetBead();
             sparks.Clear();
 
             ShowStatusImmediate(
@@ -617,21 +638,27 @@ namespace WeldingTrainer.FusionDemo
         private void BreakStroke()
         {
             previousWelding = false;
+            AdvanceThermal(false, currentMetres, currentMetres);
             if (sparks != null && sparks.isActiveAndEnabled)
                 sparks.SetWelding(false, sparks.transform.position, sparks.transform.forward);
         }
 
         private void UpdateHud(string message)
         {
+            string thermalStatus = ThermalStatus();
+            if (!string.IsNullOrEmpty(thermalStatus)) message = thermalStatus + "\n" + message;
             status = message;
 
             if (statusText == null || Time.unscaledTime < nextHudUpdate)
                 return;
 
             nextHudUpdate = Time.unscaledTime + 0.1f;
+            statusText.color = thermal != null && thermal.Burned[bead.Coverage.IndexAt(currentMetres)]
+                ? new Color(1, 0.3f, 0.2f)
+                : warningCells > 0 ? new Color(1f, 0.65f, 0.15f) : Color.white;
             statusText.text =
                 $"Статус\n" +
-                $"{bead.Coverage.Fraction:P0} проварено\n" +
+                $"{bead.Coverage.Fraction:P0} обработано\n" +
                 $"Мощность: {laserPowerWatts:F0} Ватт\n" +
                 $"Скорость: {filteredTravelSpeedMps * 1000f:F0} мм/с\n" +
                 $"Проплавление: {currentPenetrationMm:F1}/{materialThicknessMm:F1} мм\n" +
@@ -650,13 +677,30 @@ namespace WeldingTrainer.FusionDemo
         private void OnGUI()
         {
             if (!showDesktopPanel || controlMode != ControlMode.Desktop || bead == null || bead.Coverage == null) return;
-            GUILayout.BeginArea(new Rect(20, 20, 500, 215), GUI.skin.box);
-            GUILayout.Label($"FUSION  |  {bead.Coverage.Fraction:P1} welded  |  {status}");
+            GUILayout.BeginArea(new Rect(20, 20, 560, 280), GUI.skin.box);
+            string panelStatus = attemptState == AttemptState.Completed
+                ? $"Проход завершён | Прожжено {thermal.BurnedCount * bead.Coverage.CellLength * 1000f:F0} мм"
+                : status;
+            GUILayout.Label($"FUSION  |  {bead.Coverage.Fraction:P1} обработано  |  {panelStatus}");
             GUILayout.Label($"Power: {laserPowerWatts:F0} W  |  Speed: {filteredTravelSpeedMps * 1000f:F0} mm/s  |  Penetration(model): {currentPenetrationMm:F1} mm");
             GUILayout.Label("Up/Down: power   J/L: along seam   I/K: height   U/O: depth\nSpace: weld   Shift: fast   R: reset   F2: presentation");
             if (GUILayout.Button(rehearsing ? "Stop presentation" : "Present: LEFT -> RIGHT")) ToggleRehearsal();
+            if (GUILayout.Button("Show overheating at the centre")) StartOverheatRehearsal();
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("-100 W")) AdjustLaserPower(-laserPowerStepWatts);
+            if (GUILayout.Button("+100 W")) AdjustLaserPower(laserPowerStepWatts);
+            GUILayout.EndHorizontal();
             if (GUILayout.Button("Reset weld")) ResetAttempt();
             GUILayout.EndArea();
+        }
+
+        public void StartOverheatRehearsal()
+        {
+            if (controlMode != ControlMode.Desktop) return;
+            ResetAttempt();
+            rehearsing = overheatRehearsal = true;
+            waitForTriggerRelease = false;
+            rehearsalStart = Time.time;
         }
 
         private void OnApplicationFocus(bool value)
@@ -684,6 +728,8 @@ namespace WeldingTrainer.FusionDemo
 
         private void OnDestroy()
         {
+            burnVisual?.Dispose();
+            if (graphBars != null) Destroy(graphBars);
             if (debugAxesRoot != null)
                 Destroy(debugAxesRoot);
 
@@ -710,7 +756,7 @@ namespace WeldingTrainer.FusionDemo
 
             return startSide switch
             {
-                StartSide.Left  => IsAtRightEnd(metres),
+                StartSide.Left => IsAtRightEnd(metres),
                 StartSide.Right => IsAtLeftEnd(metres),
                 _ => false
             };
@@ -770,12 +816,14 @@ namespace WeldingTrainer.FusionDemo
                     : "RIGHT -> LEFT";
 
             completedSummary =
-                "Сварка завершена\n" +
+                (thermal.BurnedCount > 0 ? "Проход завершён — обнаружены прожоги\n" : "Сварка завершена\n") +
+                $"Прожжено: {thermal.BurnedCount * bead.Coverage.CellLength * 1000f:F0} мм; " +
+                $"целый шов: {(bead.Coverage.CoveredCount - thermal.BurnedCount) / (float)thermal.Count:P0}\n" +
                 $"Итоговое время: {totalTime:F1} с\n" +
                 $"Время работы: {arcOnTime:F1} с\n" +
                 $"Средняя мощность: {averagePowerWatts:F0} Вт\n" +
                 $"Средняя скорость: {averageSpeed * 1000f:F0} мм/с\n" +
-                $"Проплавка (модель), ср/мин/макс: " +
+                $"Проплавка целых участков, ср/мин/макс: " +
                 $"{averagePenetrationMm:F1}/{minimumPenetrationMm:F1}/{maximumPenetrationMm:F1} мм\n" +
                 $"Участков с полным проплавлением: {fullPenetrationPercent:F0}%\n" +
                 $"Количество прерываний: {interruptions}\n" +
@@ -812,6 +860,7 @@ namespace WeldingTrainer.FusionDemo
 
             if (statusText != null)
             {
+                statusText.color = Color.white;
                 statusText.text = text;
             }
         }
@@ -821,14 +870,7 @@ namespace WeldingTrainer.FusionDemo
             float maxPower = Mathf.Max(minimumLaserPowerWatts, maximumLaserPowerWatts);
             laserPowerWatts = Mathf.Clamp(watts, minPower, maxPower);
 
-            float previewSpeed =
-                filteredTravelSpeedMps > 0f
-                    ? filteredTravelSpeedMps
-                    : referenceTravelSpeedMps;
-
-            currentPenetrationMm =
-                CalculatePenetrationMm(laserPowerWatts, previewSpeed);
-
+            // Changing the setpoint must not rewrite previously measured penetration.
             UpdatePenetrationGraph(true);
         }
 
@@ -871,11 +913,23 @@ namespace WeldingTrainer.FusionDemo
             if (bead == null || bead.Coverage == null)
                 return;
 
-            penetrationByCellMm =
-                new float[bead.Coverage.Count];
-
-            filteredTravelSpeedMps =
-                Mathf.Max(referenceTravelSpeedMps, minimumModelSpeedMps);
+            thermal = new SeamThermalModel(bead.Coverage.Count, FusionBead.Length)
+            {
+                ReferencePower = Mathf.Max(1, referencePowerWatts),
+                ReferenceDepth = Mathf.Max(0.01f, referencePenetrationMm),
+                Thickness = Mathf.Max(0.1f, materialThicknessMm),
+                DepthExponent = Mathf.Clamp(penetrationEnergyExponent, 0.1f, 2f),
+                Footprint = Mathf.Max(bead.Coverage.CellLength, heatedFootprintMetres),
+                FormationDose = Mathf.Max(0.01f, formationDoseSeconds),
+                ReferenceExposure = Mathf.Max(0.01f, referenceExposureSeconds),
+                CoolingTime = Mathf.Max(0.01f, thermalCoolingSeconds),
+                WarningFraction = Mathf.Clamp(burnWarningFraction, 0.5f, 0.99f),
+                BurnExtraDose = Mathf.Max(0.05f, burnThroughExtraDoseSeconds)
+            };
+            penetrationByCellMm = thermal.PenetrationMm;
+            burnVisual = new FusionBurnThroughVisual(workpiece, bead, burnThroughSurfaces);
+            lastThermalTime = Time.time;
+            filteredTravelSpeedMps = 0f;
 
             SetLaserPower(laserPowerWatts);
 
@@ -890,8 +944,7 @@ namespace WeldingTrainer.FusionDemo
             bool continuous,
             float metres)
         {
-            float targetSpeed =
-                Mathf.Max(referenceTravelSpeedMps, minimumModelSpeedMps);
+            float targetSpeed = 0f;
 
             if (continuous)
             {
@@ -899,13 +952,10 @@ namespace WeldingTrainer.FusionDemo
 
                 if (dt > 0.0001f)
                 {
-                    targetSpeed =
-                        Mathf.Abs(metres - previousMetres) / dt;
+                    targetSpeed = Mathf.Abs(metres - previousMetres) / dt;
                 }
             }
 
-            targetSpeed =
-                Mathf.Max(targetSpeed, minimumModelSpeedMps);
 
             if (filteredTravelSpeedMps <= 0f)
                 filteredTravelSpeedMps = targetSpeed;
@@ -921,84 +971,39 @@ namespace WeldingTrainer.FusionDemo
                     targetSpeed,
                     smoothing);
 
-            return Mathf.Max(
-                filteredTravelSpeedMps,
-                minimumModelSpeedMps);
+            return filteredTravelSpeedMps;
         }
 
-        private float CalculatePenetrationMm(
-            float powerWatts,
-            float travelSpeedMps)
+        private void AdvanceThermal(bool welding, float from, float to)
         {
-            float safeReferencePower =
-                Mathf.Max(referencePowerWatts, 1f);
-
-            float safeReferenceSpeed =
-                Mathf.Max(referenceTravelSpeedMps, 0.001f);
-
-            float safeSpeed =
-                Mathf.Max(
-                    travelSpeedMps,
-                    Mathf.Max(minimumModelSpeedMps, 0.001f));
-
-            // Presentation/empirical surrogate:
-            // line energy is proportional to P / v. The calibration fields define
-            // the penetration at one known operating point. This is NOT a thermal
-            // solver and should be fitted to measured coupons for quantitative use.
-            float referenceLineEnergy =
-                safeReferencePower / safeReferenceSpeed;
-
-            float lineEnergy =
-                Mathf.Max(powerWatts, 0f) / safeSpeed;
-
-            float ratio =
-                referenceLineEnergy > 0f
-                    ? lineEnergy / referenceLineEnergy
-                    : 0f;
-
-            float depth =
-                Mathf.Max(referencePenetrationMm, 0f) *
-                Mathf.Pow(
-                    Mathf.Max(ratio, 0f),
-                    Mathf.Max(penetrationEnergyExponent, 0.01f));
-
-            return Mathf.Clamp(
-                depth,
-                0f,
-                Mathf.Max(materialThicknessMm, 0.01f));
-        }
-
-        private void RecordPenetration(
-            float fromMetres,
-            float toMetres,
-            float depthMm)
-        {
-            if (penetrationByCellMm == null ||
-                bead == null ||
-                bead.Coverage == null)
+            if (thermal == null) return;
+            float dt = Mathf.Max(0, Time.time - lastThermalTime);
+            if (dt <= 0) return;
+            lastThermalTime = Time.time;
+            // Long gaps cool the part, they never count as unobserved laser exposure.
+            thermal.Step(dt, laserPowerWatts, from, to, welding && dt <= maximumSampleGap);
+            warningCells = 0;
+            for (int i = 0; i < thermal.Count; i++)
             {
-                return;
+                if (thermal.Active[i] && thermal.Formed[i]) bead.DepositCell(i);
+                if (thermal.Burned[i]) bead.BurnCell(i);
+                if (thermal.IsWarning(i)) warningCells++;
             }
-
-            int first =
-                bead.Coverage.IndexAt(
-                    Mathf.Min(fromMetres, toMetres));
-
-            int last =
-                bead.Coverage.IndexAt(
-                    Mathf.Max(fromMetres, toMetres));
-
-            for (int i = first; i <= last; i++)
-            {
-                // A repeated pass stores the deepest predicted penetration at
-                // that location rather than adding depths arithmetically.
-                penetrationByCellMm[i] =
-                    Mathf.Max(
-                        penetrationByCellMm[i],
-                        depthMm);
-            }
-
+            int cell = bead.Coverage.IndexAt(currentMetres);
+            currentPenetrationMm = thermal.PenetrationMm[cell];
+            burnVisual.Refresh(thermal);
             UpdatePenetrationGraph(false);
+        }
+
+        private string ThermalStatus()
+        {
+            if (thermal == null) return string.Empty;
+            int cell = bead.Coverage.IndexAt(currentMetres);
+            if (thermal.Burned[cell]) return "ПРОЖОГ — отверстие; участок повреждён";
+            if (warningCells > 0) return "ОПАСНОСТЬ ПРОЖОГА\nПереместите инструмент или снизьте мощность";
+            if (thermal.BurnedCount > 0) return $"Прожжено {thermal.BurnedCount * bead.Coverage.CellLength * 1000f:F0} мм шва";
+            if (thermal.Active[cell] && !thermal.Formed[cell]) return "Нагрев — металл ещё не сформирован";
+            return string.Empty;
         }
 
         private void GetPenetrationStatistics(
@@ -1030,7 +1035,7 @@ namespace WeldingTrainer.FusionDemo
 
             for (int i = 0; i < penetrationByCellMm.Length; i++)
             {
-                if (!bead.Coverage[i])
+                if (!bead.Coverage[i] || thermal.Burned[i])
                     continue;
 
                 float value = penetrationByCellMm[i];
@@ -1109,9 +1114,15 @@ namespace WeldingTrainer.FusionDemo
 
             penetrationGraphLine =
                 CreatePenetrationGraphLine(
-                    "Penetration",
-                    new Color(0.1f, 0.85f, 1f, 1f),
+                    "Tool position",
+                    Color.white,
                     penetrationGraphLineWidth);
+
+            CreateGraphBars();
+            warningThresholdLine = CreatePenetrationGraphLine("Warning depth", new Color(1, 0.65f, 0.1f), penetrationGraphLineWidth * 0.5f);
+            graphLegend = CreatePenetrationGraphText("Legend", TextAnchor.UpperLeft);
+            graphLegend.characterSize *= 0.6f;
+            graphLegend.text = "Голубой: глубина | Оранжевый: перегрев\nКрасный: отверстие | Белая линия: инструмент";
 
             penetrationGraphTitle =
                 CreatePenetrationGraphText(
@@ -1142,6 +1153,23 @@ namespace WeldingTrainer.FusionDemo
             float halfWidth = width * 0.5f;
             float z = 0f;
 
+            warningThresholdLine.positionCount = 2;
+            warningThresholdLine.SetPosition(0, new Vector3(-halfWidth, height * thermal.WarningFraction, -0.002f));
+            warningThresholdLine.SetPosition(1, new Vector3(halfWidth, height * thermal.WarningFraction, -0.002f));
+            graphLegend.transform.localPosition = new Vector3(-halfWidth, -penetrationGraphTextSize * 4, -0.002f);
+            var zero = CreatePenetrationGraphText("Depth zero", TextAnchor.MiddleRight);
+            zero.text = "0 мм";
+            zero.transform.localPosition = new Vector3(-halfWidth - penetrationGraphTextSize, 0, 0);
+            var middle = CreatePenetrationGraphText("Depth middle", TextAnchor.MiddleRight);
+            middle.text = $"{thermal.Thickness * 0.5f:F1}";
+            middle.transform.localPosition = new Vector3(-halfWidth - penetrationGraphTextSize, height * 0.5f, 0);
+            var half = CreatePenetrationGraphText("Seam middle", TextAnchor.UpperCenter);
+            half.text = "0.5 м";
+            half.transform.localPosition = new Vector3(0, -penetrationGraphTextSize * 1.2f, 0);
+            var grid = CreatePenetrationGraphLine("Half-depth grid", new Color(0.25f,0.3f,0.35f), penetrationGraphLineWidth * 0.3f);
+            grid.positionCount = 2;
+            grid.SetPosition(0, new Vector3(-halfWidth, height * 0.5f, 0));
+            grid.SetPosition(1, new Vector3(halfWidth, height * 0.5f, 0));
             penetrationGraphFrame.positionCount = 5;
             penetrationGraphFrame.SetPosition(
                 0,
@@ -1182,6 +1210,42 @@ namespace WeldingTrainer.FusionDemo
                     halfWidth,
                     -penetrationGraphTextSize * 1.2f,
                     0f);
+        }
+
+        private void CreateGraphBars()
+        {
+            var chart = new GameObject("Depth cells", typeof(MeshFilter), typeof(MeshRenderer));
+            chart.transform.SetParent(penetrationGraphRoot.transform, false);
+            graphBars = new Mesh { name = "Fusion depth chart" };
+            graphBars.MarkDynamic();
+            graphVertices = new Vector3[(thermal.Count + 1) * 4];
+            graphColors = new Color[graphVertices.Length];
+            var indices = new int[(thermal.Count + 1) * 6];
+            for (int i = 0; i <= thermal.Count; i++)
+            {
+                int v = i * 4, t = i * 6;
+                indices[t] = v; indices[t+1] = v+1; indices[t+2] = v+2;
+                indices[t+3] = v; indices[t+4] = v+2; indices[t+5] = v+3;
+            }
+            graphBars.vertices = graphVertices;
+            graphBars.triangles = indices;
+            chart.GetComponent<MeshFilter>().sharedMesh = graphBars;
+            var material = new Material(Resources.Load<Shader>("FusionGraph"));
+            ownedRuntimeMaterials.Add(material);
+            var renderer = chart.GetComponent<MeshRenderer>();
+            renderer.sharedMaterial = material;
+            renderer.shadowCastingMode = ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+        }
+
+        private void SetGraphQuad(int index, float left, float right, float bottom, float top, float z, Color color)
+        {
+            int v = index * 4;
+            graphVertices[v] = new Vector3(left,bottom,z);
+            graphVertices[v+1] = new Vector3(left,top,z);
+            graphVertices[v+2] = new Vector3(right,top,z);
+            graphVertices[v+3] = new Vector3(right,bottom,z);
+            for (int j = 0; j < 4; j++) graphColors[v+j] = color;
         }
 
         private LineRenderer CreatePenetrationGraphLine(
@@ -1272,6 +1336,8 @@ namespace WeldingTrainer.FusionDemo
                 penetrationGraphTextSize;
             text.fontSize = 32;
             text.color = Color.white;
+            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            text.GetComponent<MeshRenderer>().sharedMaterial = text.font.material;
 
             if (statusText != null)
             {
@@ -1326,57 +1392,35 @@ namespace WeldingTrainer.FusionDemo
             nextPenetrationGraphUpdate =
                 Time.unscaledTime + 0.08f;
 
-            int count =
-                penetrationByCellMm.Length;
-
-            penetrationGraphLine.positionCount =
-                count;
-
-            float width =
-                Mathf.Max(0.05f, penetrationGraphSize.x);
-
-            float height =
-                Mathf.Max(0.03f, penetrationGraphSize.y);
-
-            float halfWidth =
-                width * 0.5f;
-
-            float thickness =
-                Mathf.Max(materialThicknessMm, 0.01f);
-
+            int count = thermal.Count;
+            float width = Mathf.Max(0.05f, penetrationGraphSize.x);
+            float height = Mathf.Max(0.03f, penetrationGraphSize.y);
+            float halfWidth = width * 0.5f;
+            // Separate cells do not interpolate a fictitious depth across untouched gaps.
             for (int i = 0; i < count; i++)
             {
-                float t =
-                    count > 1
-                        ? i / (float)(count - 1)
-                        : 0f;
-
-                float x =
-                    Mathf.Lerp(
-                        -halfWidth,
-                        halfWidth,
-                        t);
-
-                float normalizedDepth =
-                    Mathf.Clamp01(
-                        penetrationByCellMm[i] /
-                        thickness);
-
-                float y =
-                    normalizedDepth * height;
-
-                penetrationGraphLine.SetPosition(
-                    i,
-                    new Vector3(
-                        x,
-                        y,
-                        -0.001f));
+                float left = -halfWidth + width * i / count;
+                float right = -halfWidth + width * (i + 1) / count;
+                float depth = thermal.PenetrationMm[i] / thermal.Thickness;
+                Color color = thermal.Burned[i] ? new Color(1,0.12f,0.08f) :
+                    thermal.IsWarning(i) ? new Color(1,0.6f,0.1f) : new Color(0.1f,0.75f,0.95f);
+                float top = thermal.Burned[i] ? height * 1.08f : depth * height;
+                SetGraphQuad(i, left, right, 0, top, -0.001f, color);
             }
+            SetGraphQuad(count, -halfWidth - 0.055f, halfWidth + 0.02f, -0.075f,
+                height + 0.045f, 0.006f, new Color(0.025f, 0.035f, 0.05f));
+            graphBars.vertices = graphVertices;
+            graphBars.colors = graphColors;
+            graphBars.RecalculateBounds();
+            float cursorX = -halfWidth + width * Mathf.Clamp01(currentMetres / FusionBead.Length);
+            penetrationGraphLine.positionCount = 2;
+            penetrationGraphLine.SetPosition(0, new Vector3(cursorX, 0, -0.004f));
+            penetrationGraphLine.SetPosition(1, new Vector3(cursorX, height * 1.1f, -0.004f));
 
             if (penetrationGraphTitle != null)
             {
                 penetrationGraphTitle.text =
-                    $"Проплавка (модель), P={laserPowerWatts:F0} Вт";
+                    $"Глубина / {laserPowerWatts:F0} Вт | Прожоги: {thermal.BurnedCount * bead.Coverage.CellLength * 1000f:F0} мм";
             }
 
             if (penetrationGraphTopLabel != null)
