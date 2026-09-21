@@ -8,6 +8,7 @@
 /unity/[Bb]uilds/
 /unity/[Mm]emoryCaptures/
 /unity/[Rr]ecordings/
+/unity/.utmp/
 /unity/.vs/
 /unity/.vscode/
 /unity/.idea/
@@ -15,13 +16,6 @@
 /unity/*.sln
 /unity/*.slnx
 /unity/*.user
-
-# Arduino / ESP32 local configuration
-/firmware/**/secrets.h
-/firmware/**/config.local.h
-
-# Optional local Arduino build output
-/firmware/build/
 
 # .NET standalone test output
 **/bin/
@@ -49,7 +43,6 @@
 /exports/
 /captures/
 /data-local/
-/firmware/provisioning-output/
 /.vscode/settings.json
 *.keystore
 *.jks
