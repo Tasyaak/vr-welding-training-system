@@ -9,8 +9,8 @@ namespace WeldingTrainer.Prototype
 {
     /// <summary>
     /// Demo-only vertical slice for early scene/XR testing.
-    /// It intentionally uses one straight seam and no QR, ESP32, Spatial Anchor,
-    /// persistence, Hall sensor, or production session architecture.
+    /// It intentionally uses one straight seam without production calibration,
+    /// persistence, safety state, or production session architecture.
     ///
     /// Add this component explicitly to a scene GameObject.
     /// Assign Tracking Origin to OVRCameraRig/TrackingSpace in the Inspector.

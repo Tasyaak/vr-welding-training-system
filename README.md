@@ -1,149 +1,54 @@
-# Welding VR Training System
+# VR Welding Training System
 
-Mixed-reality training system for handheld laser welding on Meta Quest 3
+Standalone Meta Quest 3 mixed-reality training for handheld laser-welding processes.
 
-The application runs standalone on Quest 3 and overlays training information on a real, stationary workpiece visible through passthrough. The project is intended to evaluate and guide the trainee's movement along predefined weld seams using controller tracking, QR-based workpiece registration, visual/audio/haptic feedback, ESP32 telemetry, and local session logging
+## Approved MVP
 
-## Repository structure
+The MVP uses one right Touch Plus controller rigidly attached to a mock tool, a
+stationary fixture, four-point fixture calibration, local deterministic
+evaluation, virtual nozzle/clamp state, geometric contact, software emergency
+stop and reflection-risk training. It supports Fusion, Wobble, Pulsed, and
+pre/post-weld cleaning workflows.
 
-```text
-welding-vr-training-system/
-├── .github/
-│   └── workflows/
-│       └── repository-checks.yml
-├── analysis/
-├── docs/
-│   ├── architecture.md
-│   ├── coordinate-conventions.md
-│   ├── git-and-github.md
-│   └── setup.md
-├── firmware/
-│   └── README.md
-├── protocol/
-│   └── specification.md
-├── tests/
-├── unity/
-│   ├── Assets/
-│   │   └── Trainer/
-│   │       ├── Application/
-│   │       ├── Content/
-│   │       ├── Domain/
-│   │       ├── Infrastructure/
-│   │       ├── Platform/
-│   │       ├── Presentation/
-│   │       └── Scenes/
-│   ├── Packages/
-│   └── ProjectSettings/
-├── .editorconfig
-├── .gitattributes
-├── .gitignore
-└── README.md
-```
+The runtime is Quest-only. It has no QR registration, external sensor,
+microcontroller, network peer, magnet, electromagnetic actuator, physical clamp,
+second-controller workflow, or copied commercial-machine interface.
 
-### Main directories
+## Current repository state
 
-- `unity/` — the Unity project. Open this directory in Unity Hub
-- `unity/Assets/Trainer/` — project-owned Unity code, scenes, configuration, and content
-- `firmware/` — ESP32 firmware developed with Arduino IDE
-- `protocol/` — the Quest ↔ ESP32 communication contract
-- `analysis/` — offline analysis of exported session data
-- `tests/` — project-level tests that do not naturally belong inside Unity or firmware
-- `docs/` — architecture, setup, coordinate conventions, and collaboration documentation
-- `.github/` — GitHub automation such as repository hygiene checks
+- `unity/Assets/Trainer/Development/Prototype/` contains the integrated
+  presentation prototype.
+- `unity/Assets/Trainer/Scenes/Bootstrap.unity` contains the Quest XR,
+  passthrough, MRUK and prototype scene composition.
+- `docs/` defines the production architecture and ordered implementation plan.
+- Production Domain/Application modules are planned in Issues #46–#58 and are
+  not yet integrated into `main`.
 
-Unity-generated folders such as `unity/Library/`, `unity/Temp/`, `unity/Logs/`, and `unity/UserSettings/` are local files and must not be committed
+Pending pull requests are proposals, not proof that their files are in `main`.
+See `docs/quest-only-migration.md` for the Issue/PR adoption matrix.
 
-## Development prerequisites
+## Software
 
-Install:
+- Unity `6000.3.24f1`
+- Meta XR Core and MR Utility Kit `205.0.0`
+- Unity OpenXR `1.16.1`
+- Android Build Support for standalone Quest deployment
 
-- [Unity Hub](https://docs.unity.com/en-us/hub/install-hub) (register first)
-- Unity 6.3 LTS in the Unity Hub with platform modules Android Build Support (OpenJDK and Android SDK & NDK Tools), don't install Microsoft Visual Studio Community 2026 and сancel automatic download of newest Unity LTS version
-- VS Code
-- Extensions in the VS Code:
-  - Unity — C# and C# Dev Kit will be installed automatically 
-  - Python — optional, for data analysis
-  - Jupyter — optional, for data analysis
-- Git
-- GitHub CLI — optional, for working with a github repository via a terminal
+Open the existing `unity` directory in Unity Hub; do not create another Unity
+project. Then open `Assets/Trainer/Scenes/Bootstrap.unity`.
 
-A Meta Quest 3 is required for final MR/device integration testing
-
-## Clone and open the project
-
-Clone the repository:
-
-```bash
-gh repo clone OWNER/REPOSITORY
-cd REPOSITORY
-```
-
-or:
-
-```bash
-git clone <repository-clone-url>
-cd REPOSITORY
-```
-
-In Unity Hub, choose **Add project from disk** and select:
+## Validation
 
 ```text
-<repository>/unity
+python tests/repository_checks.py
 ```
 
-Do not create a new Unity project and copy `Assets` into it.
+Then run Unity compilation and the Quest smoke-test procedure in
+`docs/setup.md`. Device results must be recorded as evidence; Editor Play Mode
+does not validate passthrough, tracking, permissions, anchors or performance.
 
-On the first open, Unity restores dependencies from:
+## Safety boundary
 
-```text
-unity/Packages/manifest.json
-unity/Packages/packages-lock.json
-```
-
-Developers normally do not reinstall project packages manually. The first restore requires Internet access
-
-If package restoration fails, close Unity and delete `unity/Library/PackageCache/` or, if necessary, the complete local `unity/Library/` directory, then reopen the project. Do not delete the tracked `manifest.json` or `packages-lock.json`
-
-## Unity project rules
-
-Commit `.meta` files together with their corresponding Unity assets
-
-Do not casually update Unity, Meta XR, OpenXR, MRUK, Splines, or other shared packages as part of unrelated work. Package changes affect the whole team and should be reviewed in a dedicated task/PR
-
-Project-owned code and content should normally be placed under:
-
-```text
-unity/Assets/Trainer/
-```
-
-## Firmware and protocol
-
-The ESP32 firmware is stored under `firmware/`
-
-Do not commit Wi-Fi credentials, tokens, local IP overrides, or other station-specific secrets
-
-When changing the Quest ↔ ESP32 message format or semantics, update:
-
-```text
-protocol/specification.md
-```
-
-and verify both Unity and firmware sides together
-
-## Git and GitHub workflow
-
-Normal feature work must not be done directly on `main`
-
-Use short-lived task branches, Pull Requests, review, relevant tests, and squash merge
-
-The complete project-specific Git/GitHub guide is here:
-
-**[`docs/git-and-github.md`](docs/git-and-github.md)**
-
-It explains commits, branches, `.gitignore`, `.gitattributes`, Issues, Pull Requests, branch synchronization, conflict resolution, GitHub CLI, and the recommended workflow for this project
-
-The staged implementation plan is documented in
-**[`docs/roadmap.md`](docs/roadmap.md)**.
-
-The temporary presentation prototype and its Unity/Quest test procedure are
-documented in **[`docs/tomorrow-prototype-runbook.md`](docs/tomorrow-prototype-runbook.md)**.
+This is a training aid. It never controls or authorizes a real laser. Software
+activation, contact, reflection and emergency-stop states are simulated and
+must fail closed when required tracking, calibration or session state is invalid.

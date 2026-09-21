@@ -1,81 +1,90 @@
-# Architecture
+# Quest-only architecture
 
-## Goals
-
-The application runs standalone on Meta Quest 3. It registers a stationary
-workpiece in passthrough, tracks a handheld welding tool, evaluates motion along
-a configured seam, presents feedback, exchanges telemetry and haptic commands
-with an ESP32, and stores session results locally.
-
-The implementation uses dependency direction as its main boundary:
+## Dependency direction
 
 ```text
-Presentation / Platform / Infrastructure
-                  |
-                  v
-             Application
-                  |
-                  v
-                Domain
+Presentation / Platform.Meta / Infrastructure.Local
+                         |
+                         v
+                    Application
+                         |
+                         v
+                       Domain
 ```
 
-`Domain` must not depend on Unity scene objects, Meta XR, networking, storage,
-or UI. `Application` coordinates use cases through interfaces. The outer layers
-adapt Unity and device APIs to those interfaces.
+Domain is deterministic C# and must not depend on Unity scene objects, Meta XR,
+storage or UI. Application owns process/session state through ports. Outer
+modules translate Unity, Quest and persistence APIs at the boundary.
 
-## Unity modules
+Forbidden runtime dependencies are QR recognition, network sockets, external
+firmware, external sensors, magnets, coils and second-controller input.
 
-| Directory | Responsibility |
+## Responsibilities
+
+| Module | Responsibility |
 | --- | --- |
-| `Trainer/Domain` | Seam geometry, samples, tolerances, scoring, and session results |
-| `Trainer/Application` | Calibration, session state machine, evaluation orchestration |
-| `Trainer/Platform/Meta` | Quest tracking, passthrough, anchors, QR registration, haptics |
-| `Trainer/Infrastructure/ESP32` | Transport, protocol encoding, connection health |
-| `Trainer/Infrastructure` | Local logs, configuration, clocks, identifiers |
-| `Trainer/Presentation` | HUD, audio, visual guidance, results |
-| `Trainer/Content` | Workpiece and seam definitions; no runtime secrets |
-| `Trainer/Scenes` | Composition roots only; start with `Bootstrap.unity` |
+| `Trainer.Domain` | Fixture/surface geometry, seams, tool pose, modes, contact, reflection risk, coverage, scoring and results |
+| `Trainer.Application` | Calibration workflow, process/session state, interlock, E-stop, replay journal and use cases |
+| `Trainer.Platform.Meta` | Right Touch Plus input, tracking health, passthrough, session anchor and lifecycle |
+| `Trainer.Infrastructure.Local` | Monotonic clock, IDs, crash-aware local recording and export |
+| `Trainer.Presentation` | MR guidance, menu, feedback, Touch Plus haptics and review |
+| `Trainer.Content` | Versioned fixture, surface, tool and process definitions |
+| `Trainer.Scenes` | Composition roots only |
 
-Use assembly definitions as code is introduced so the dependency direction is
-enforced by the compiler. Scene components should translate Unity types at the
-boundary; domain calculations should use explicit value objects and SI units.
+## Frame graph
+
+```text
+Tracking/World
+    -> SessionAnchor
+        -> Fixture
+            -> Workpiece
+                -> authored surfaces and seams
+
+RightController
+    -> Tool
+        -> Tip
+        -> virtual nozzle
+```
+
+Four measured fixture points solve `Fixture -> SessionAnchor`. Production
+evaluation uses fixture/workpiece-local data; presentation converts results to
+world space. Recenter or tracking-origin changes must not silently redefine the
+calibrated fixture.
 
 ## Runtime flow
 
-1. Bootstrap services and verify permissions/device availability.
-2. Register the physical workpiece and establish `Workpiece` coordinates.
-3. Load a versioned workpiece/seam definition.
-4. Start a session and sample the tool pose at a monotonic timestamp.
-5. Transform each sample into `Workpiece` coordinates.
-6. Evaluate position, orientation, speed, continuity, and trigger state.
-7. Publish feedback and optional ESP32 haptic commands.
-8. Persist raw samples, events, configuration version, and summary atomically.
+1. Bootstrap passthrough, right-controller tracking, local storage and UI.
+2. Select versioned fixture, tool and process content.
+3. Acquire four ordered fixture points and validate rigid-fit residuals.
+4. Create a session-only anchor and freeze the accepted calibration generation.
+5. Select nozzle/process settings, apply virtual clamp and explicitly arm.
+6. Sample one right controller using a monotonic timestamp.
+7. Evaluate surface contact, seam motion, process behavior and reflection risk.
+8. Apply the unified fail-closed interlock and semantic feedback.
+9. Record inputs, state transitions, configuration and outputs for replay.
+10. Review, retry, export or end the session.
 
-## State machine
+## Authoritative state
 
-```text
-Boot -> Ready -> Registering -> Calibrated -> Training -> Review
-  |       |          |              |            |
-  +------ Error <----+--------------+------------+
-```
+Application owns one explicit process/session state. Tracking loss, calibration
+invalidity, contact loss, E-stop, latched reflection fault or missing mandatory
+provider inhibits simulated activation. Recovery requires stable inputs, trigger
+release and explicit re-arm; faults never clear merely because a frame became
+valid again.
 
-Transitions are explicit and logged. Losing registration or required device
-connectivity pauses evaluation instead of silently producing invalid scores.
+## Units and determinism
 
-## Data and safety rules
+- metres, seconds and metres/second in Domain;
+- radians in Domain and serialized numeric contracts;
+- degrees only in authoring UI and trainee-facing presentation, with explicit
+  conversion at the boundary;
+- monotonic time for evaluation/replay, UTC only as metadata;
+- versioned content, evaluator and export schemas.
 
-- Store distances in metres, angles in degrees, time in seconds, and speed in
-  metres per second. Display-layer conversions must be explicit.
-- Use a monotonic clock for durations and UTC only for wall-clock metadata.
-- Version seam definitions, protocol messages, and exported session schemas.
-- Never store credentials, tokens, station IPs, or participant identifiers in
-  tracked Unity assets.
-- Treat this as a training aid, not a real-welder safety interlock.
+## Testing
 
-## Testing strategy
-
-- Domain: deterministic edit-mode tests for geometry and scoring.
-- Application: state-machine and failure-path tests with fake adapters.
-- Protocol: golden vectors and malformed-message tests shared with firmware.
-- Device: Quest smoke test covering permissions, passthrough, registration,
-  tracking loss, reconnect, logging, and thermal/performance behavior.
+- Domain: pure deterministic tests for local geometry, modes and coverage.
+- Application: scripted clocks/inputs for state, interlock, faults and replay.
+- Unity: clean import, EditMode/PlayMode composition and missing-reference checks.
+- Quest: passthrough, right-controller-only input, calibration, recenter/resume,
+  E-stop, recording, thermal/frame-time and battery smoke tests.

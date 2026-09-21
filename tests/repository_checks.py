@@ -30,7 +30,16 @@ FORBIDDEN_PREFIXES = (
     "unity/Builds/",
     "unity/MemoryCaptures/",
     "unity/Recordings/",
+    "unity/.utmp/",
 )
+
+RETIRED_RUNTIME_PREFIXES = (
+    "firmware/",
+    "protocol/",
+    "unity/Assets/Trainer/Infrastructure/ESP32",
+)
+
+RETIRED_SCENE_NAMES = ("HallSensorFrame",)
 
 
 def tracked_files() -> list[str]:
@@ -86,8 +95,8 @@ def main() -> int:
     for name in tracked:
         if name.startswith(FORBIDDEN_PREFIXES):
             errors.append(f"Generated Unity path is tracked: {name}")
-        if name.endswith(("/secrets.h", "/config.local.h")):
-            errors.append(f"Local firmware configuration is tracked: {name}")
+        if name.startswith(RETIRED_RUNTIME_PREFIXES):
+            errors.append(f"Retired external-device path is tracked: {name}")
         if Path(name).name in {".DS_Store", "Thumbs.db"}:
             errors.append(f"OS-generated file is tracked: {name}")
 
@@ -97,6 +106,13 @@ def main() -> int:
 
     check_build_scenes(errors)
     check_dev_agent_settings(errors)
+
+    scene_path = ROOT / "unity/Assets/Trainer/Scenes/Bootstrap.unity"
+    if scene_path.is_file():
+        scene_text = scene_path.read_text(encoding="utf-8")
+        for object_name in RETIRED_SCENE_NAMES:
+            if f"m_Name: {object_name}" in scene_text:
+                errors.append(f"Retired scene object remains: {object_name}")
 
     if errors:
         print("\n".join(f"ERROR: {error}" for error in errors))
