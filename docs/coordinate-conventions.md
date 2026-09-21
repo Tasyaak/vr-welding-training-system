@@ -26,3 +26,8 @@ Persist the calibration generation with each sample or event that depends on it.
 
 Do not infer a frame from scene hierarchy, use Euler angles in Domain, or apply
 presentation smoothing to stored evaluator metrics.
+
+The calibrated tool's backward axis follows the legacy tool-angle convention.
+The incident beam direction used by reflection training points from the head
+toward the contacted surface and is therefore the opposite directional concept;
+neither is inferred from a seam tangent or surface normal.

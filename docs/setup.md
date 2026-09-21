@@ -53,6 +53,8 @@ When those scripts land:
 Until a mandatory provider exists, the composition root must show the missing
 provider and keep simulated process activation inhibited.
 
+For issue #46 content creation and validation, follow `content-authoring.md`.
+
 ## Quest smoke test
 
 Build and Run to Quest 3 with Wi-Fi disabled or unrelated to the application.

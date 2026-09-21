@@ -54,6 +54,12 @@ transitions, calibration generation/residuals, process timing, coverage,
 interlock reasons and summary metrics. Replay must reproduce decisions without
 Unity scene-object identity or participant personal data.
 
+Authoring uses one selected versioned catalog entry containing exactly four
+labeled fixture points, finite polygonal surface patches, baked directed seams,
+cleaning regions, a right-controller tool definition and five discriminated
+process profiles. Catalog baking rejects unsupported scale and invalid geometry;
+attempt startup freezes a deep immutable snapshot and deterministic hashes.
+
 ## Failure behavior
 
 - tracking/calibration/contact loss: inhibit immediately;

@@ -31,6 +31,11 @@ firmware, external sensors, magnets, coils and second-controller input.
 | `Trainer.Content` | Versioned fixture, surface, tool and process definitions |
 | `Trainer.Scenes` | Composition roots only |
 
+Content crosses into Domain only through validated baking. Unity authoring
+objects remain mutable editor data; application code receives a deep immutable
+`ContentSnapshot` with deterministic complete-content and evaluation hashes.
+See `content-authoring.md`.
+
 ## Frame graph
 
 ```text

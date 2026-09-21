@@ -1,0 +1,14 @@
+{
+  "name": "WeldingTrainer.Content",
+  "rootNamespace": "WeldingTrainer.Content",
+  "references": ["WeldingTrainer.Domain"],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}
