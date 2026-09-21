@@ -22,7 +22,7 @@ namespace WeldingTrainer.FusionDemo
         public ControlMode controlMode = ControlMode.Desktop;
         public Transform trackingOrigin;
         public Transform externalTip;
-        public Vector3 controllerTipOffset = new Vector3(-0.12f, 0, 0);
+        public Vector3 controllerTipOffset = new Vector3(0, -0.12f, 0.12f);
         public Vector3 controllerTipEulerOffset = Vector3.zero;
         [Tooltip("ExternalTip mode: drive these through your own input adapter.")]
         public bool externalTrigger;
@@ -411,7 +411,7 @@ namespace WeldingTrainer.FusionDemo
 
             UpdateHud(
                 welding
-                    ? "Сварка"
+                    ? "Процесс сварки"
                     : trigger
                         ? "Переместите рабочий орган интрумента в начало заготовки"
                         : attemptState == AttemptState.Welding
@@ -654,8 +654,8 @@ namespace WeldingTrainer.FusionDemo
 
             nextHudUpdate = Time.unscaledTime + 0.1f;
             statusText.color = thermal != null && thermal.Burned[bead.Coverage.IndexAt(currentMetres)]
-                ? new Color(1, 0.3f, 0.2f)
-                : warningCells > 0 ? new Color(1f, 0.65f, 0.15f) : Color.white;
+                ? new Color(1f, 0.25f, 0.18f)
+                : warningCells > 0 ? new Color(1f, 0.75f, 0.10f) : Color.white;
             statusText.text =
                 $"Статус\n" +
                 $"{bead.Coverage.Fraction:P0} обработано\n" +
@@ -823,8 +823,8 @@ namespace WeldingTrainer.FusionDemo
                 $"Время работы: {arcOnTime:F1} с\n" +
                 $"Средняя мощность: {averagePowerWatts:F0} Вт\n" +
                 $"Средняя скорость: {averageSpeed * 1000f:F0} мм/с\n" +
-                $"Проплавка целых участков, ср/мин/макс: " +
-                $"{averagePenetrationMm:F1}/{minimumPenetrationMm:F1}/{maximumPenetrationMm:F1} мм\n" +
+                // $"Проплавка целых участков, ср/мин/макс: " +
+                // $"{averagePenetrationMm:F1}/{minimumPenetrationMm:F1}/{maximumPenetrationMm:F1} мм\n" +
                 $"Участков с полным проплавлением: {fullPenetrationPercent:F0}%\n" +
                 $"Количество прерываний: {interruptions}\n" +
                 $"Среднее отклонение: {averageDistance * 1000f:F1} мм\n" +
@@ -1158,7 +1158,7 @@ namespace WeldingTrainer.FusionDemo
             warningThresholdLine.SetPosition(1, new Vector3(halfWidth, height * thermal.WarningFraction, -0.002f));
             graphLegend.transform.localPosition = new Vector3(-halfWidth, -penetrationGraphTextSize * 4, -0.002f);
             var zero = CreatePenetrationGraphText("Depth zero", TextAnchor.MiddleRight);
-            zero.text = "0 мм";
+            zero.text = "0\nмм";
             zero.transform.localPosition = new Vector3(-halfWidth - penetrationGraphTextSize, 0, 0);
             var middle = CreatePenetrationGraphText("Depth middle", TextAnchor.MiddleRight);
             middle.text = $"{thermal.Thickness * 0.5f:F1}";
@@ -1320,20 +1320,17 @@ namespace WeldingTrainer.FusionDemo
             string objectName,
             TextAnchor anchor)
         {
-            GameObject textObject =
-                new GameObject(objectName);
+            GameObject textObject = new GameObject(objectName);
 
             textObject.transform.SetParent(
                 penetrationGraphRoot.transform,
                 false);
 
-            TextMesh text =
-                textObject.AddComponent<TextMesh>();
+            TextMesh text = textObject.AddComponent<TextMesh>();
 
             text.anchor = anchor;
             text.alignment = TextAlignment.Left;
-            text.characterSize =
-                penetrationGraphTextSize;
+            text.characterSize = penetrationGraphTextSize;
             text.fontSize = 32;
             text.color = Color.white;
             text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
@@ -1349,8 +1346,7 @@ namespace WeldingTrainer.FusionDemo
                 MeshRenderer targetRenderer =
                     text.GetComponent<MeshRenderer>();
 
-                if (sourceRenderer != null &&
-                    targetRenderer != null)
+                if (sourceRenderer != null && targetRenderer != null)
                 {
                     targetRenderer.sharedMaterial =
                         sourceRenderer.sharedMaterial;
@@ -1426,7 +1422,7 @@ namespace WeldingTrainer.FusionDemo
             if (penetrationGraphTopLabel != null)
             {
                 penetrationGraphTopLabel.text =
-                    $"{materialThicknessMm:F1} мм";
+                    $"{materialThicknessMm:F1}\nмм";
             }
 
             if (penetrationGraphLeftLabel != null)
