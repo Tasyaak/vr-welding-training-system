@@ -384,6 +384,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 679690222}
+  - component: {fileID: 679690223}
   m_Layer: 0
   m_Name: TrainerBootstrap
   m_TagString: Untagged
@@ -406,6 +407,27 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1756673351}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &679690223
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 679690221}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 47a00000000000000000000000000007, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: WeldingTrainer.Scenes::WeldingTrainer.Scenes.ProductionTrainerBootstrap
+  _productionEnabled: 1
+  _prototypeDemo: {fileID: 1927381596}
+  _selectedCatalog: {fileID: 0}
+  _inputProvider: {fileID: 0}
+  _registrationProvider: {fileID: 0}
+  _safetyProvider: {fileID: 0}
+  _recorderProvider: {fileID: 0}
+  _snapshotSink: {fileID: 0}
+  _hapticsProvider: {fileID: 0}
 --- !u!1001 &1097856265
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -1177,7 +1199,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &1927381597
 Transform:
   m_ObjectHideFlags: 0

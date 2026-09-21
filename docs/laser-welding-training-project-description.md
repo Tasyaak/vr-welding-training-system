@@ -75,3 +75,16 @@ attempt startup freezes a deep immutable snapshot and deterministic hashes.
 `main` currently contains the presentation prototype and Quest scene. Production
 features are implemented in order by Issues #46–#58. Historical external-device
 design is intentionally retired; see `quest-only-migration.md`.
+
+# Production session and process flow
+
+The standalone Quest runtime uses one authoritative application coordinator for all five
+process modes. Registration is accepted before content selection; each attempt freezes one
+versioned content/profile snapshot; nozzle and clamp preparation are explicit; and activation
+is possible only while all tracking, registration, recording, and safety inputs are valid.
+Loss of those inputs suspends or inhibits the attempt without synthesizing missed poses.
+
+The normal flow is registration, seam/process selection, preparation, arm, running,
+save/review, then a distinct retry/new attempt or session completion. Emergency stop dominates
+commands at the same timestamp and immediately stops haptics. Prototype evaluation is disabled
+whenever the production composition root is enabled.
