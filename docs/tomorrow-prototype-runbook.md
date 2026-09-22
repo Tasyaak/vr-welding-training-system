@@ -31,3 +31,9 @@ there is no runtime network dependency.
 Record a successful backup video. Explain that the prototype validates the
 presentation interaction while Issues #46–#58 build the production fixture
 calibration, process modes, safety state and deterministic recording.
+# Production right-controller check
+
+For the production scene, use the control mapping and Quest qualification checklist in
+[right-controller-input.md](right-controller-input.md). Test with the left controller powered
+off, record the active controller layout, and verify a short B press in training, calibration,
+and menu contexts before evaluating process behavior.

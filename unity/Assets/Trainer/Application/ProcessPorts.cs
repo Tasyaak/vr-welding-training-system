@@ -2,6 +2,25 @@ using WeldingTrainer.Domain;
 
 namespace WeldingTrainer.Application
 {
+    public enum InputContext { Training, Calibration, Menu, Suspended }
+
+    [System.Flags]
+    public enum InputCommandEdges
+    {
+        None = 0, EmergencyStop = 1 << 0, Confirm = 1 << 1,
+        MenuToggle = 1 << 2, TriggerPressed = 1 << 3, TriggerReleased = 1 << 4
+    }
+
+    public readonly struct TrackedPoseSnapshot
+    {
+        public readonly RigidPose Pose;
+        public readonly bool DeviceValid, PositionValid, RotationValid;
+        public bool IsValid => DeviceValid && PositionValid && RotationValid;
+        public TrackedPoseSnapshot(RigidPose pose, bool deviceValid, bool positionValid, bool rotationValid)
+        { Pose = pose; DeviceValid = deviceValid; PositionValid = positionValid; RotationValid = rotationValid; }
+        public static TrackedPoseSnapshot Invalid => new(default, false, false, false);
+    }
+
     public interface IMonotonicClock { double Seconds { get; } }
     public interface IIdentifierSource { string NewId(); }
 
@@ -10,11 +29,28 @@ namespace WeldingTrainer.Application
         public readonly bool Available, HeadValid, ToolValid, TriggerPressed, EmergencyStopPressed;
         public readonly long Generation;
         public readonly double SourceTimestampSeconds;
+        public readonly float TriggerValue;
+        public readonly InputContext Context;
+        public readonly InputCommandEdges CommandEdges;
+        public readonly TrackedPoseSnapshot Head, Controller, Tool, Tip;
         public InputSnapshot(bool available, bool headValid, bool toolValid, bool trigger,
             bool emergencyStop, long generation, double sourceTimestamp)
         { Available = available; HeadValid = headValid; ToolValid = toolValid;
           TriggerPressed = trigger; EmergencyStopPressed = emergencyStop;
-          Generation = generation; SourceTimestampSeconds = sourceTimestamp; }
+          Generation = generation; SourceTimestampSeconds = sourceTimestamp;
+          TriggerValue = trigger ? 1f : 0f; Context = InputContext.Training;
+          CommandEdges = emergencyStop ? InputCommandEdges.EmergencyStop : InputCommandEdges.None;
+          Head = Controller = Tool = Tip = TrackedPoseSnapshot.Invalid; }
+
+        public InputSnapshot(bool available, TrackedPoseSnapshot head, TrackedPoseSnapshot controller,
+            TrackedPoseSnapshot tool, TrackedPoseSnapshot tip, float triggerValue, bool triggerPressed,
+            InputCommandEdges edges, InputContext context, long generation, double sourceTimestamp)
+        { Available = available; Head = head; Controller = controller; Tool = tool; Tip = tip;
+          HeadValid = head.IsValid; ToolValid = tool.IsValid && tip.IsValid;
+          TriggerValue = triggerValue; TriggerPressed = triggerPressed;
+          EmergencyStopPressed = (edges & InputCommandEdges.EmergencyStop) != 0;
+          CommandEdges = edges; Context = context; Generation = generation;
+          SourceTimestampSeconds = sourceTimestamp; }
     }
 
     public readonly struct RegistrationSnapshot
@@ -46,6 +82,7 @@ namespace WeldingTrainer.Application
     }
 
     public interface IInputSnapshotSource { InputSnapshot Capture(double monotonicSeconds); }
+    public interface IInputContextControl { InputContext Context { get; } void SetContext(InputContext context); }
     public interface IRegistrationStateSource { RegistrationSnapshot Capture(double monotonicSeconds); void Teardown(); }
     public interface IActivationSafetyPort { SafetyDecision Evaluate(EvaluationRequest request); }
     public interface IProcessSnapshotSink { void Publish(ProcessSnapshot snapshot); }

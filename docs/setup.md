@@ -8,6 +8,9 @@
 - Meta Quest Developer Hub or `adb`;
 - developer-enabled Meta Quest 3 and one right Touch Plus controller.
 
+Production input setup and the complete control/qualification checklist are documented in
+[right-controller-input.md](right-controller-input.md).
+
 ## Open and validate
 
 1. Clone the repository and open its existing `unity` directory in Unity Hub.

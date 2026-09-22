@@ -98,6 +98,9 @@ namespace WeldingTrainer.Application
 
             if (input.EmergencyStopPressed)
                 _commands.Add(new ProcessCommand(ProcessCommandType.EmergencyStop, now, ++_commandSequence));
+            if ((input.CommandEdges & InputCommandEdges.MenuToggle) != 0 &&
+                _lifecycle == SessionLifecycle.Running)
+                _commands.Add(new ProcessCommand(ProcessCommandType.Pause, now, ++_commandSequence));
 
             foreach (ProcessCommand command in _commands.Where(x => x.TimestampSeconds <= now)
                 .OrderBy(x => x.TimestampSeconds).ThenBy(x => x.Priority).ThenBy(x => x.SubmissionSequence).ToArray())
@@ -152,7 +155,7 @@ namespace WeldingTrainer.Application
             if (_triggerReleaseRequired && !input.TriggerPressed) _triggerReleaseRequired = false;
             if (_lifecycle == SessionLifecycle.Running &&
                 (reasons & (InhibitReason.RegistrationInvalid | InhibitReason.RegistrationChanged |
-                 InhibitReason.MissingRegistration | InhibitReason.ToolTrackingInvalid |
+                 InhibitReason.MissingInput | InhibitReason.MissingRegistration | InhibitReason.ToolTrackingInvalid |
                  InhibitReason.HeadTrackingInvalid | InhibitReason.MaximumSampleGapExceeded)) != 0)
             {
                 _activation = ActivationState.Inhibited;

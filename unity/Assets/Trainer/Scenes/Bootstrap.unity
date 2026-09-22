@@ -422,7 +422,7 @@ MonoBehaviour:
   _productionEnabled: 1
   _prototypeDemo: {fileID: 1927381596}
   _selectedCatalog: {fileID: 0}
-  _inputProvider: {fileID: 0}
+  _inputProvider: {fileID: 1150042810}
   _registrationProvider: {fileID: 0}
   _safetyProvider: {fileID: 0}
   _recorderProvider: {fileID: 0}
@@ -813,6 +813,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1150042809}
+  - component: {fileID: 1150042810}
   m_Layer: 0
   m_Name: PlatformAdapters
   m_TagString: Untagged
@@ -835,6 +836,21 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1869996100}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1150042810
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1150042808}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 48a00000000000000000000000000004, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: WeldingTrainer.Platform.Meta::WeldingTrainer.Platform.Meta.RightControllerInputAdapter
+  _catalog: {fileID: 0}
+  _triggerPressThreshold: 0.55
+  _triggerReleaseThreshold: 0.45
 --- !u!1 &1165618988
 GameObject:
   m_ObjectHideFlags: 0

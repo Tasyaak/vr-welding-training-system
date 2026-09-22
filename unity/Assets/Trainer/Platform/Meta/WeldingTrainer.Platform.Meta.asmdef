@@ -1,0 +1,14 @@
+{
+  "name": "WeldingTrainer.Platform.Meta",
+  "rootNamespace": "WeldingTrainer.Platform.Meta",
+  "references": ["WeldingTrainer.Domain", "WeldingTrainer.Application", "WeldingTrainer.Content", "Unity.InputSystem"],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

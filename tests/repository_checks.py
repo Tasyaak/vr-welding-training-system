@@ -83,6 +83,19 @@ def check_dev_agent_settings(errors: list[str]) -> None:
         errors.append("DevAgentSettings.asset must be disabled in source control")
 
 
+def check_production_input_ownership(errors: list[str]) -> None:
+    generic_actions = ROOT / "unity/Assets/InputSystem_Actions.inputactions"
+    if generic_actions.is_file() and '"path": "<XRController' in generic_actions.read_text(encoding="utf-8"):
+        errors.append("Generic InputSystem_Actions must not consume XR controller controls")
+
+    scene = ROOT / "unity/Assets/Trainer/Scenes/Bootstrap.unity"
+    if scene.is_file():
+        text = scene.read_text(encoding="utf-8")
+        marker = "WeldingTrainer.Platform.Meta.RightControllerInputAdapter"
+        if text.count(marker) != 1:
+            errors.append("Bootstrap must contain exactly one production right-controller adapter")
+
+
 def main() -> int:
     tracked = tracked_files()
     tracked_set = set(tracked)
@@ -106,6 +119,7 @@ def main() -> int:
 
     check_build_scenes(errors)
     check_dev_agent_settings(errors)
+    check_production_input_ownership(errors)
 
     scene_path = ROOT / "unity/Assets/Trainer/Scenes/Bootstrap.unity"
     if scene_path.is_file():

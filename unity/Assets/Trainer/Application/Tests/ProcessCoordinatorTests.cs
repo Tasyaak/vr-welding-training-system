@@ -69,6 +69,18 @@ namespace WeldingTrainer.Application.Tests
         }
 
         [Test]
+        public void MenuEdgeSuspendsRunningAttempt()
+        {
+            PrepareRunning();
+            var invalid = TrackedPoseSnapshot.Invalid;
+            _input.Snapshot = new InputSnapshot(true, invalid, invalid, invalid, invalid, 0, false,
+                InputCommandEdges.MenuToggle, InputContext.Menu, 2, _clock.Seconds);
+            _coordinator.Tick();
+            Assert.That(_coordinator.Current.Lifecycle, Is.EqualTo(SessionLifecycle.Suspended));
+            Assert.That(_coordinator.Current.Activation, Is.EqualTo(ActivationState.Disarmed));
+        }
+
+        [Test]
         public void ProcessChangeWhileRunningIsRejected()
         {
             PrepareRunning();
@@ -187,6 +199,56 @@ namespace WeldingTrainer.Application.Tests
                 var profiles = new[] { P("fusion",new FusionSettings(),"welding-nozzle"), P("wobble",new WobbleSettings(.005,4),"welding-nozzle"), P("pulse",new PulsedSettings(.05,.05),"welding-nozzle"), P("pre",new CleaningSettings(ProcessMode.PreWeldCleaning),"cleaning-nozzle"), P("post",new CleaningSettings(ProcessMode.PostWeldCleaning),"cleaning-nozzle") };
                 return ContentSnapshot.Freeze(new ContentCatalogEntry("catalog", fixture, workpiece, tool, profiles));
             }
+        }
+    }
+
+    public sealed class InputContextGateTests
+    {
+        [Test]
+        public void EmergencyStopEdgeSurvivesUntilConsumed()
+        {
+            var gate = new InputContextGate(.55f, .45f);
+            gate.Queue(InputCommandEdges.EmergencyStop);
+            Assert.That(gate.ConsumeEdges(), Is.EqualTo(InputCommandEdges.EmergencyStop));
+            Assert.That(gate.ConsumeEdges(), Is.EqualTo(InputCommandEdges.None));
+        }
+
+        [Test]
+        public void ContextChangeRequiresReleaseBeforeTriggerCanRestart()
+        {
+            var gate = new InputContextGate(.55f, .45f);
+            gate.SetContext(InputContext.Training); gate.AdvanceTrigger(1f);
+            Assert.That(gate.ProcessPressed, Is.False);
+            gate.AdvanceTrigger(0f); gate.AdvanceTrigger(1f);
+            Assert.That(gate.ProcessPressed, Is.True);
+            gate.SetContext(InputContext.Menu); gate.SetContext(InputContext.Training);
+            gate.AdvanceTrigger(1f);
+            Assert.That(gate.ProcessPressed, Is.False);
+        }
+
+        [Test]
+        public void TriggerUsesHysteresis()
+        {
+            var gate = new InputContextGate(.6f, .4f);
+            gate.SetContext(InputContext.Training); gate.AdvanceTrigger(0f); gate.AdvanceTrigger(.61f);
+            Assert.That(gate.ProcessPressed, Is.True);
+            gate.AdvanceTrigger(.5f); Assert.That(gate.ProcessPressed, Is.True);
+            gate.AdvanceTrigger(.39f); Assert.That(gate.ProcessPressed, Is.False);
+        }
+    }
+
+    public sealed class RigidPoseMathTests
+    {
+        [Test]
+        public void ComposeAppliesControllerRotationBeforeTranslation()
+        {
+            double half = Math.Sqrt(.5);
+            var worldFromController = new RigidPose(new Vector3d(1, 2, 3), new Quaterniond(0, half, 0, half));
+            var controllerFromTip = new RigidPose(new Vector3d(0, 0, 1), Quaterniond.Identity);
+            RigidPose result = RigidPoseMath.Compose(worldFromController, controllerFromTip);
+            Assert.That(result.PositionMetres.X, Is.EqualTo(2).Within(1e-9));
+            Assert.That(result.PositionMetres.Y, Is.EqualTo(2).Within(1e-9));
+            Assert.That(result.PositionMetres.Z, Is.EqualTo(3).Within(1e-9));
         }
     }
 }
