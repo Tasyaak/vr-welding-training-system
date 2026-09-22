@@ -8,6 +8,10 @@ evaluation uses fixture/workpiece-local coordinates.
 - `Tracking/World`: current Quest tracking space.
 - `SessionAnchor`: session-only stable anchor owned by the platform adapter.
 - `Fixture`: solved by ordered four-point rigid calibration.
+
+The solver publishes `world_from_fixture`; authored `workpiece_from_fixture` is then composed to
+produce `world_from_workpiece`. Scale is exactly one. See
+[four-point-registration.md](four-point-registration.md) for acquisition and acceptance gates.
 - `Workpiece`: authored offset under the fixture.
 - `Tool`: rigid pose derived from the right controller.
 - `Tip`: calibrated tool-local offset used for contact and seam evaluation.

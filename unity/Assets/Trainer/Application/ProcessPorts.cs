@@ -57,8 +57,16 @@ namespace WeldingTrainer.Application
     {
         public readonly bool Available, Valid;
         public readonly long Generation;
+        public readonly RegistrationWorkflowState State;
+        public readonly RigidPose WorldFromFixture, WorldFromWorkpiece;
+        public readonly string InvalidReason;
         public RegistrationSnapshot(bool available, bool valid, long generation)
-        { Available = available; Valid = valid; Generation = generation; }
+        { Available = available; Valid = valid; Generation = generation; State = valid ? RegistrationWorkflowState.Registered : RegistrationWorkflowState.Unregistered;
+          WorldFromFixture = WorldFromWorkpiece = default; InvalidReason = valid ? null : "unavailable"; }
+        public RegistrationSnapshot(bool available, bool valid, long generation, RegistrationWorkflowState state,
+            RigidPose fixture, RigidPose workpiece, string reason)
+        { Available=available;Valid=valid;Generation=generation;State=state;WorldFromFixture=fixture;
+          WorldFromWorkpiece=workpiece;InvalidReason=reason; }
     }
 
     public readonly struct SafetyDecision
@@ -84,6 +92,28 @@ namespace WeldingTrainer.Application
     public interface IInputSnapshotSource { InputSnapshot Capture(double monotonicSeconds); }
     public interface IInputContextControl { InputContext Context { get; } void SetContext(InputContext context); }
     public interface IRegistrationStateSource { RegistrationSnapshot Capture(double monotonicSeconds); void Teardown(); }
+    public interface IRegistrationInputConsumer { void UpdateInput(InputSnapshot input, double monotonicSeconds); }
+    public interface ICalibrationWorkflow
+    {
+        RegistrationWorkflowState State { get; }
+        string CurrentPointId { get; }
+        RegistrationCandidate Candidate { get; }
+        void AcceptPreview();
+        void Recapture(string pointId);
+        void ReportFixtureMoved();
+    }
+    public readonly struct AnchorCreationResult
+    {
+        public readonly bool Success, Localized; public readonly string Error;
+        public AnchorCreationResult(bool success, bool localized, string error)
+        { Success=success;Localized=localized;Error=error; }
+    }
+    public interface ISessionAnchorPort
+    {
+        void BeginCreate(RigidPose worldFromFixture, long generation, System.Action<long, AnchorCreationResult> completed);
+        bool IsLocalized { get; }
+        void DestroyAnchor();
+    }
     public interface IActivationSafetyPort { SafetyDecision Evaluate(EvaluationRequest request); }
     public interface IProcessSnapshotSink { void Publish(ProcessSnapshot snapshot); }
     public interface IHapticLifecyclePort { void StopImmediately(); }

@@ -148,6 +148,18 @@ namespace WeldingTrainer.Application.Tests
             Assert.That(_recorder.TornDown, Is.True);
         }
 
+        [Test]
+        public void CalibrationOriginChangeInvalidatesAndDestroysAnchor()
+        {
+            var anchor = new FakeAnchor();
+            var calibration = new FixtureCalibrationCoordinator(anchor);
+            calibration.Begin(TestContent.Create(), 10, 1);
+            calibration.Tick(new InputSnapshot(false, false, false, false, false, 11, 2), 2);
+            Assert.That(calibration.State, Is.EqualTo(RegistrationWorkflowState.Lost));
+            Assert.That(anchor.DestroyCount, Is.GreaterThanOrEqualTo(2));
+            Assert.That(calibration.Capture(2).Valid, Is.False);
+        }
+
         private void PrepareReady()
         {
             _coordinator.StartSession(); _registration.Snapshot = new RegistrationSnapshot(true, true, 7); _coordinator.Tick();
@@ -183,6 +195,12 @@ namespace WeldingTrainer.Application.Tests
             public bool FinishAttempt(string id, bool interrupted, out string error)
             { FinishedAttemptIds.Add(id); error = FinishSucceeds ? null : "disk-fault"; return FinishSucceeds; }
             public void Teardown() => TornDown = true;
+        }
+        private sealed class FakeAnchor : ISessionAnchorPort
+        {
+            public int DestroyCount; public bool IsLocalized { get; set; }
+            public void BeginCreate(RigidPose pose, long generation, Action<long, AnchorCreationResult> completed) { }
+            public void DestroyAnchor() => DestroyCount++;
         }
 
         private static class TestContent
@@ -250,5 +268,53 @@ namespace WeldingTrainer.Application.Tests
             Assert.That(result.PositionMetres.Y, Is.EqualTo(2).Within(1e-9));
             Assert.That(result.PositionMetres.Z, Is.EqualTo(3).Within(1e-9));
         }
+    }
+
+    public sealed class FourPointRigidSolverTests
+    {
+        [Test]
+        public void PlanarRectangleRecoversKnownRigidTransform()
+        {
+            FixtureDefinition fixture=Fixture(Rectangle());
+            double half=Math.Sqrt(.5);var expected=new RigidPose(new Vector3d(.3,1.1,-.2),new Quaterniond(0,half,0,half));
+            var captures=fixture.ReferencePoints.Select(p=>Capture(p.Id,
+                RigidPoseMath.Rotate(expected.Rotation,p.FixturePositionMetres)+expected.PositionMetres)).ToArray();
+            RegistrationCandidate result=FourPointRigidSolver.Solve(fixture,captures);
+            Assert.That(result.Quality.Accepted,Is.True);
+            Assert.That(result.Quality.ResidualMetres,Has.All.LessThan(1e-7));
+            Assert.That(Vector3d.Distance(result.WorldFromFixture.PositionMetres,expected.PositionMetres),Is.LessThan(1e-7));
+        }
+
+        [Test]
+        public void CollinearLayoutIsRejected()
+        {
+            Vector3d[] points={new(0,0,0),new(.1,0,0),new(.2,0,0),new(.3,0,0)};
+            FixtureDefinition fixture=Fixture(points);
+            RegistrationCandidate result=FourPointRigidSolver.Solve(fixture,points.Select((p,i)=>Capture("p"+(i+1),p)).ToArray());
+            Assert.That(result.Quality.Reason,Is.EqualTo(RegistrationValidityReason.DegenerateLayout));
+        }
+
+        [Test]
+        public void ScaleMismatchIsRejected()
+        {
+            FixtureDefinition fixture=Fixture(Rectangle());Vector3d[] measured=Rectangle().Select(x=>x*1.2).ToArray();
+            RegistrationCandidate result=FourPointRigidSolver.Solve(fixture,measured.Select((p,i)=>Capture("p"+(i+1),p)).ToArray());
+            Assert.That(result.Quality.Reason,Is.EqualTo(RegistrationValidityReason.DimensionMismatch));
+        }
+
+        [Test]
+        public void CaptureRejectsOneLargeOutlierButKeepsRequiredSamples()
+        {
+            Vector3d[] samples={new(0,0,0),new(.0001,0,0),new(0,.0001,0),new(1,1,1)};
+            CalibrationPointCapture capture=CalibrationCaptureMath.Build("p1",samples,3,.003,4);
+            Assert.That(capture.RetainedCount,Is.EqualTo(3));
+            Assert.That(capture.SpreadMetres,Is.LessThan(.003));
+        }
+
+        private static Vector3d[] Rectangle()=>new[]{new Vector3d(-.2,0,-.1),new Vector3d(.2,0,-.1),new Vector3d(.2,0,.1),new Vector3d(-.2,0,.1)};
+        private static CalibrationPointCapture Capture(string id,Vector3d point)=>new(id,point,5,5,.0001,1);
+        private static FixtureDefinition Fixture(Vector3d[] points)=>new("fixture",1,
+            points.Select((p,i)=>new ReferencePointDefinition("p"+(i+1),p)),new Vector3d(.4,.02,.2),RigidPose.Identity,
+            new CalibrationPolicy(3,.003,.005,.05,.002));
     }
 }

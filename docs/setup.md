@@ -11,6 +11,9 @@
 Production input setup and the complete control/qualification checklist are documented in
 [right-controller-input.md](right-controller-input.md).
 
+Fixture labeling, four-point capture, ghost confirmation, and session-anchor setup are documented
+in [four-point-registration.md](four-point-registration.md).
+
 ## Open and validate
 
 1. Clone the repository and open its existing `unity` directory in Unity Hub.

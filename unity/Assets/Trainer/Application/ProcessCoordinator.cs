@@ -93,6 +93,8 @@ namespace WeldingTrainer.Application
         {
             double now = _clock.Seconds;
             InputSnapshot input = _input.Capture(now);
+            if (_registration is IRegistrationInputConsumer registrationInput)
+                registrationInput.UpdateInput(input, now);
             RegistrationSnapshot registration = _registration.Capture(now);
             _inputGeneration = input.Generation;
 
