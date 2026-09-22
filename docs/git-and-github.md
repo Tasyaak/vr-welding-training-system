@@ -1,7 +1,7 @@
 # Git and GitHub workflow
 
-`main` is protected by review and CI. Work in one issue-focused branch, keep
-commits reviewable, and never commit generated Unity data or local secrets.
+Work in reviewable issue-focused branches; keep main protected by review/CI.
+Do not commit generated Unity data, credentials or participant information.
 
 ## Standard flow
 
@@ -9,38 +9,37 @@ commits reviewable, and never commit generated Unity data or local secrets.
 git fetch origin
 git switch main
 git pull --ff-only
-git switch -c feature/<issue>-<short-name>
+git switch -c codex/<issue>-<short-name>
 python tests/repository_checks.py
-git status
 git add <explicit paths>
 git commit -m "Describe the outcome"
-git push -u origin feature/<issue>-<short-name>
+git push -u origin codex/<issue>-<short-name>
 ```
 
-Pull requests must describe scope, architecture impact, tests run, Unity Editor
-changes, Quest evidence and known pending hardware/device verification. A
-pending PR is proposed code until merged; documentation must not describe it as
-integrated.
+Preserve dirty work; use an isolated worktree when necessary. PRs describe final
+behavior, architecture impact, relevant checks and actual/pending device tests.
+Proposed code is not integrated code until merged.
 
-## Repository rules
+## Parallel ownership
 
-- Keep `Assets`, `Packages` and `ProjectSettings`; never track `Library`, `Temp`,
-  `Obj`, `Logs`, `.utmp`, builds, recordings or IDE state.
-- Commit Unity `.meta` files with their assets; do not manually invent GUIDs.
-- Never commit tokens, keystores, participant identity or station-local data.
-- Do not create external-device, network, QR, second-controller or hardware
-  fallback paths; the approved MVP is Quest-only.
-- Package changes require a dedicated rationale and lockfile review.
-- Preserve user work in dirty trees; use a separate worktree for isolated work.
+Use [roadmap](roadmap.md) and [contract v1](parallel-development-contract.md).
+A spatial issues and B training issues have no cross-group implementation
+blockers; #58 owns the production join. Commit synthetic fixtures with B and
+adapter tests with A. Do not change another group's contract semantics without
+updating the document and both conformance suites.
 
-## Verification
+Existing unmerged PRs are excluded from this revised plan. Do not wait for or
+adopt them as prerequisites. Historical comments may describe older decisions;
+the revised issue body and current architecture documents define active scope.
 
-Run repository checks for every change. Run Unity EditMode/PlayMode tests for
-affected modules and a clean import/compile for scene/package changes. Device
-features require standalone Quest evidence; Editor behavior is not a substitute.
+## Repository rules and verification
 
-## Historical work
-
-Old PRs and issues may describe the superseded architecture. Their disposition
-and reusable parts are listed in `quest-only-migration.md`; do not merge an old
-stack merely because its checks passed at the time.
+- Commit Unity assets with their actual .meta files; never invent GUIDs.
+- Do not track Library/Temp/Obj/Logs/.utmp/builds/recordings.
+- Keep firmware, Hall, coil and external networking removed.
+- Fixture-mounted QR is required; no four-point fallback or left-controller path.
+- Package/config changes need a rationale and lockfile review.
+- Run repository checks for every PR; run relevant model/PlayMode tests for code.
+- Unity/Quest behavior needs actual evidence; docs-only checks do not qualify it.
+- Close redundant issues with an explanatory replacement link rather than
+  deleting their history; avoid multiple active trackers for the same feature.

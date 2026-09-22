@@ -1,62 +1,59 @@
 # Development and Unity setup
 
-## Required software
+## Pinned environment
 
-- Unity Hub and Unity `6000.3.24f1`;
-- Android Build Support, OpenJDK and Android SDK/NDK;
-- Git and a C# editor;
-- Meta Quest Developer Hub or `adb`;
-- developer-enabled Meta Quest 3 and one right Touch Plus controller.
+Unity Hub + Unity 6000.3.24f1, Android Build Support/OpenJDK/SDK/NDK,
+Core/MRUK 205.0.0, OpenXR 1.16.1, Input System 1.20.0, Git and a C# editor.
+Use a developer-enabled Quest 3, right Touch Plus mock tool, stationary fixture,
+bolted part and the correctly installed fixture QR for device acceptance.
 
-## Open and validate
+Open the existing unity directory and Bootstrap scene. Restore locked packages,
+select Android/OpenXR, run Meta Project Setup Tool and inspect missing references.
+Run `python tests/repository_checks.py` from the repository root.
 
-1. Clone the repository and open its existing `unity` directory in Unity Hub.
-2. Allow the locked packages to restore; do not reinstall or upgrade packages.
-3. Open `Assets/Trainer/Scenes/Bootstrap.unity`.
-4. Select Android and confirm OpenXR is enabled.
-5. Run Meta Project Setup Tool and resolve blocking findings only.
-6. Check Console for compile errors and missing scripts/references.
-7. Run `python tests/repository_checks.py` from the repository root.
+## Current main versus required production wiring
 
-## Current scene composition
+Bootstrap already contains OVRCameraRig, MRUK, OVRPassthroughLayer and
+PrototypeDemo. It is a demo composition; the presence of MRUK does not prove
+that production QR registration is enabled or implemented.
+This documentation PR changes no scene/package/input asset.
 
-`Bootstrap.unity` is not an empty placeholder. It contains `OVRCameraRig`,
-`MRUK`, `OVRPassthroughLayer` and the integrated `PrototypeDemo`. The retired
-Hall frame has been removed. Production composition remains owned by #47.
+#49 must inspect current Scene/Anchor settings and spatial permission, enable
+MRUK QR tracker configuration and check actual QRCodeTrackingSupported state.
+USE_SCENE and USE_ANCHOR_API are present in the current Android manifest.
+Follow the pinned package APIs and [Meta QR setup](https://developers.meta.com/horizon/documentation/unity/unity-mr-utility-kit-qrcode-detection/);
+do not add raw-camera access solely to decode QR through MRUK.
+Vendor sample left-controller controls are not part of the production UI.
 
-MRUK is retained because the scene currently consumes its room/scene support.
-Meta Core, OpenXR, passthrough and anchor permissions are retained for Quest MR
-and four-point session anchoring. No QR permission, network service or external
-device configuration is required.
+## Assets and independent test scenes
 
-## Detailed Unity changes needed for downstream scripts
+A (#46/#48/#49) supplies versioned fixture/part/marker bindings, import scale,
+finite proxies and a standalone QR/input preview. B supplies process profiles,
+synthetic surfaces and a fake-platform training test composition.
+Both implement [contract v1](parallel-development-contract.md); neither waits
+for the other group's scene or source types.
 
-Issues #46–#58 must provide prefabs/assets and editor wiring with their code.
-When those scripts land:
+#58 wires the real adapters into one production root, disables prototype
+evaluation, routes A/menu navigation without trigger click-through, preserves
+global B/E-stop and connects one semantic feedback/recording pipeline.
 
-1. Create versioned fixture, finite-surface, seam, tool/nozzle and process assets.
-2. Add one production composition-root GameObject; do not put Domain logic on
-   arbitrary scene objects.
-3. Bind only the right Touch Plus controller to the tool-pose adapter and author
-   its rigid controller-to-tool/tip offsets.
-4. Add four visible ordered calibration-point prompts and a session-anchor
-   visual; display residual error and reject invalid fits.
-5. Add virtual clamp/nozzle, process menu, E-stop/reset/re-arm controls and
-   explicit inhibited-reason UI.
-6. Wire visual/audio/right-controller-haptic sinks to the same semantic feedback
-   state; sinks must never alter scoring.
-7. Wire crash-aware local recording and deterministic replay; keep participant
-   identity out of tracked assets and exports.
-8. Keep all serialized angles labelled in degrees in Inspector/UI and convert to
-   radians when constructing Domain values.
+For the real fixture, author QR pose/dimensions and the installed part transform.
+Do not derive exact mounting from the STEP filenames. Confirm the actual part
+and fastening, validate ghost placement and obtain a localized unsaved anchor
+before enabling preparation/arming. There is no four-touch-point workflow.
 
-Until a mandatory provider exists, the composition root must show the missing
-provider and keep simulated process activation inhibited.
+## Device procedure and evidence
 
-## Quest smoke test
+1. Record Unity/package/Quest OS/build/content versions and station binding.
+2. Launch offline; grant/deny/regrant spatial permission and test unsupported QR.
+3. Read the known QR, verify selected part/revision, reject unknown/ambiguous IDs.
+4. Validate overlay and assembly confirmation, then accept/localize the anchor.
+5. Occlude QR: registered placement remains valid while the anchor is valid.
+6. Lose anchor/tracking or recenter incoherently: output inhibits, with explicit
+   recovery; fixture movement/rebolting requires fresh registration.
+7. Test all modes, nozzle/clamp, menu, B/E-stop and re-arm with left controller off.
+8. End session: dispose anchor; next session must register afresh.
+9. Export/replay journals and measure sustained performance and geometric error.
 
-Build and Run to Quest 3 with Wi-Fi disabled or unrelated to the application.
-Verify passthrough startup, right-controller-only input, suspend/resume,
-recenter behavior and absence of missing-reference errors. Four-point
-calibration, process modes, E-stop, replay and performance checks remain pending
-until their owning issues are integrated.
+#49 owns adapter tests, #66 owns station registration/metrology, and
+#58 owns complete training acceptance. Record unperformed tests as pending.

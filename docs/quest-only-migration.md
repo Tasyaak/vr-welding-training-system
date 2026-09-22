@@ -1,64 +1,61 @@
-# Quest-only migration record
+# Architecture migration record
 
-Baseline audited: `main` at `6cf6c54f6c24540c58532dd7c4c829d4d1d35f21`.
+## Completed previous migration
 
-## Dependency inventory
+Main ee8999eb4562c9f0c77e66b5b38acdfab1a7dea2 includes #59 completing #45.
+It removed firmware/protocol placeholders, ESP32 metadata, HallSensorFrame and
+tracked .utmp output, and documented four-point registration. These are
+historical facts; the earlier four-point/QR-ban decision is no longer current.
 
-| Item | Decision | Reason / consumer |
-| --- | --- | --- |
-| Meta XR Core 205.0.0 | Retain | `OVRCameraRig`, controller tracking, passthrough and anchor APIs |
-| MR Utility Kit 205.0.0 | Retain | `MRUK` exists in `Bootstrap.unity`; room/scene MR support remains useful |
-| OpenXR 1.16.1 | Retain | Android Quest XR loader/input |
-| `USE_SCENE` permission | Retain for now | live MRUK scene consumer; #47 must re-audit when production composition replaces the demo |
-| Anchor permission | Retain | #49 session-only fixture anchor |
-| Hand-tracking feature/permission | Retain as optional package/scene configuration | not an input requirement; right Touch Plus remains authoritative |
-| Unity networking modules | Retain | no broad package deletion is justified by retiring one subsystem |
-| QR requirements/adapters | Remove | replaced by ordered four-point fixture calibration (#49) |
-| External firmware/protocol directories | Remove | no external device exists in the approved MVP |
-| Sensor/magnet/coil/electromagnetic concepts | Remove | replaced by local geometric contact and Quest haptics |
-| `HallSensorFrame` scene object | Remove | dead legacy scene frame |
-| tracked `unity/.utmp` | Untrack and ignore | generated Android/Unity build state |
+## Approved QR revision — 2026-09-22
 
-The Android manifest has no Internet/network permission. Passthrough, anchor and
-scene permissions are retained for the consumers above. Core anchors do not
-imply QR support.
+Restore only fixture-mounted QR identification/pose registration. The welding
+part is bolted to the fixture, and cataloged marker/assembly transforms establish
+its frame. QR carries the part ID; its pose comes from MRUK, not from the ID.
+Four-point touch registration is replaced, not retained as a fallback.
 
-## Issue disposition
-
-| Issue | Disposition |
+| Dependency / concept | Current disposition |
 | --- | --- |
-| #5 | Closed baseline only; #47 owns production composition |
-| #6 | Preserve versioned content; re-owned by #46 |
-| #7 | Superseded by #49; preserve session anchor, validity and local catalog concepts only |
-| #8 | Preserve lifecycle; re-owned by #47/#57 |
-| #9 | Preserve rigid tool transform and tracking health; re-owned by #48 |
-| #10 | Retain core seam evaluator; extended by #53–#56 |
-| #11 | Cancel: external firmware is outside approved MVP |
-| #12 | Cancel: network protocol/connection manager is outside approved MVP |
-| #13 | Superseded by #50–#52; retain fail-closed activation, reason reporting and release/re-arm |
-| #14 | Preserve semantic feedback; integrate under #58 |
-| #15 | Preserve visual/audio/Touch Plus feedback; remove external actuator assumptions; #58 |
-| #16 | Retain deterministic coverage/bead responsibility; extend per process mode |
-| #17 | Preserve local persistence; complete crash/replay requirements under #58 |
-| #18 | Cancel: electromagnetic feedback is outside approved MVP |
+| Meta Core / MRUK 205.0.0 | Retain for rig, passthrough, QR and anchors |
+| OpenXR 1.16.1 / right Touch Plus | Retain; one production input adapter |
+| USE_SCENE / USE_ANCHOR_API | Retain; #49 validates permission/config/runtime support |
+| Four-point solver/capture UI | No production implementation planned |
+| QR payload, pose and marker→fixture binding | Required local registration path |
+| Bolted fixture/part attachment | Required repeatable mechanical setup, explicitly confirmed |
+| Virtual electrical clamp / geometric contact | Separate training states, no sensed hardware circuit |
+| ESP32/Hall/magnets/coil/network protocol | Remain removed; do not restore old folders |
+| .utmp | Remains ignored and rejected by hygiene checks |
+| Persistent/cloud anchors or backend | Not required; session-only local registration |
 
-## Open PR adoption/rework
+No runtime code/config is changed by the documentation revision.
 
-| PRs | Decision |
-| --- | --- |
-| #22–#39 | Historical prototype stack. Keep useful rehearsal ideas only; do not promote two-point placement, old paths or legacy reset/recovery assumptions into production. |
-| #40 | Rework. Keep geometry/evaluator intent; Domain must be pure/local, use radians and avoid UnityEngine/world-space ownership. |
-| #41 | Rework. Keep explicit lifecycle/interfaces; replace scanning semantics and continuously validate calibration while running. |
-| #42 | Candidate only. Preserve atomic local-write ideas but add event journal, crash recovery, replay and storage-exhaustion behavior under #58. |
-| #43 | Adopt conceptually. Keep one semantic feedback source; integrate current safety/process reasons under #58. |
-| #44 | Rework under #16. Coverage must derive from authoritative activation/process timing in local space, preserve gaps/chunks and not infer quality from presentation state. |
+## Issue ownership
 
-No PR is merged or closed by this migration. Owners must rebase/reconcile and
-remove stale auto-close language before merge.
+- #45 remains closed as the completed historical migration. Its QR exclusion is
+  superseded by #49 and this record, not by restoring the original hardware design.
+- #46 owns spatial content and assembly binding; #49 owns QR registration.
+- #6/#8/#9 are closed as duplicates of #46/#47/#48 after explanatory comments.
+- #7 remains closed historical; #49 is the only active QR implementation issue.
+- #10/#14–#17 retain core responsibilities with current bodies.
+- #11/#12/#13/#18 stay closed; #50–#52 provide current software safety.
+- #66 covers the actual marker placement, mounting repeatability and
+  station error budget.
+- #58 joins the independent groups described in [roadmap](roadmap.md).
 
-## Required validation evidence
+Existing unmerged PRs are intentionally excluded from planning. No adoption,
+rework or merge dependency is assigned to them, and this task does not delete
+them. The current main commit is the implementation baseline.
 
-- repository checks pass and reject `.utmp` plus retired runtime vocabulary;
-- clean Unity import/compile and Bootstrap missing-reference inspection;
-- Quest passthrough startup with no network service and only right controller;
-- device evidence remains explicitly pending until performed.
+## Preserved invariants
+
+Engine-independent Domain, one activation authority, right-controller-only
+workflow, no runtime external device/network peer, deterministic timing,
+versioned geometry and local replay remain unchanged. Mechanical bolts do not
+reintroduce a physical electrical clamp. QR visibility is not continuously
+required after a valid anchor is established, but moved/rebolted parts invalidate
+registration. Unknown evidence fails closed.
+
+Repository hygiene checks do not ban the word QR; they reject retired directory
+prefixes, the Hall scene frame, generated files and unsafe local settings.
+Keep these checks intact. Qualification must separately test QR permission,
+tracking, accuracy and physical assembly conditions on Quest.
