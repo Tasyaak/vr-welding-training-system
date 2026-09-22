@@ -52,9 +52,13 @@ a verified coherent origin transformation; otherwise re-register.
 
 ## Geometry and axes
 
-Keep CAD-import-to-authored-frame transforms explicit and versioned. Two STEP
-exports are not proof of an assembly constraint. Validate axes, normals,
-dimensions and installed offsets against the physical assembly.
+Keep CAD-import-to-authored-frame transforms explicit and versioned. The supplied
+exports have confirmed nominal identity `FixtureFromWorkpiece`; physical
+deviations still require #66. #46 preserves numeric CAD axes/origin and converts
+millimetres exactly once in the bake. The recess defines nominal Marker origin
+(-0.105,0.0076,0.105) m, axes (+Fixture X, -Fixture Z, +Fixture Y), and footprint
+0.09 × 0.09 m. Printed dimensions and thickness-adjusted plane remain unknown.
+See [concrete import/normal conventions](spatial-content-authoring.md).
 
 A seam frame uses directed unit tangent t, authored outward surface normal n
 and lateral b=normalize(n cross t), with degeneracies rejected. Retain the real

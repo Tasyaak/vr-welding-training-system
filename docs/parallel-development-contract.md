@@ -1,6 +1,7 @@
 # Parallel development contract v1
 
-Status: proposed implementation contract for the QR revision, not an existing implemented API.
+Status: structural contract v1. #46 implements the spatial content subset;
+registration, input and training records remain owned by their respective issues.
 This document fixes interoperability now so two groups can implement and merge
 independently. Class names below describe data roles; they are not claims about
 classes already in main.
@@ -53,9 +54,9 @@ No vendor object, scene Transform, QR URL command, clock in unspecified units or
 quietly defaulted-valid pose may cross the boundary. Registration state is
 Unregistered/Acquiring/Preview/Anchoring/Registered/Lost/Disposed.
 Marker payload is bounded versioned UTF-8 with a required partId; the local
-catalog maps it to exactly one installed assembly binding. Where partId alone
-is ambiguous, add a bounded fixture/binding revision key or reject; never pick
-the first match. It is not authentication or proof of physical part identity.
+catalog maps it to exactly one approved mounting configuration per partId for
+this MVP. Duplicate active bindings invalidate the catalog; reject ambiguity,
+never add a mount key or pick the first match. This does not authenticate parts.
 
 A owns tracking-to-world and marker normalization. B transforms tip/head into
 the workpiece frame using the same coherent snapshot. Reject mismatched origin
@@ -90,6 +91,16 @@ Each group commits tests instantiating these values and synthetic finite geometr
 #58 verifies actual A output maps to B input without unit/frame/ID changes.
 Breaking schema changes require editing this document and both conformance suites;
 unilateral field reinterpretation is not permitted.
+
+## Implemented Group A content encoding
+
+[Spatial authoring v1](spatial-content-authoring.md) specifies the concrete
+JSON/immutable C# representation. Geometry carries source/content identity,
+finite outward triangle patches, directed seam points/cumulative metre lengths
+and triangulated pre/post masks linked to finite supports. Missing semantic
+selection blocks scored resolution. Nominal poses remain separate from station
+qualification. Lossless JSON and typed snapshots permit #58 mapping without
+requiring Group B to reference Group A assemblies now.
 
 ## Release distinction
 

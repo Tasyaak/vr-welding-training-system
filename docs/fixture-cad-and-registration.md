@@ -3,8 +3,10 @@
 ## Supplied source evidence
 
 The user supplied two separate SolidWorks 2024 STEP exports on 2026-09-22.
-They are source references, not an assembled and qualified runtime asset.
-This documentation PR does not publish or convert the binary/CAD source assets.
+The exact bytes are committed in `engineering/cad/source`, outside Unity Assets.
+The shared coordinate system is the confirmed nominal assembly. #46 supplies
+converted finite content; physical installation remains unqualified.
+See [authoring and reproducibility](spatial-content-authoring.md).
 
 | File | Schema | Solids | Explicit B-rep vertices | Length unit |
 | --- | --- | --- | --- | --- |
@@ -25,15 +27,20 @@ the following are vertex extents, not certified curved-solid bounding boxes:
 
 Both contain cylindrical surface radii approximately 3.25 mm. This does not
 establish thread type, bolt specification, number of fasteners or seating fit.
-The part's vertex minimum Y coincides with the fixture's maximum Y (8 mm),
-suggesting compatible export coordinates, but it does not prove the correct
-assembly mating transform or physical repeatability. Do not hard-code identity
-FixtureFromWorkpiece on that evidence alone. No full B-rep/CAD assembly or
-manufacturing tolerance validation has been performed.
+The project owner confirms one prescribed bolted mounting in the shared export
+coordinates. `FixtureFromWorkpiece` is nominal identity. Matching vertex heights
+alone was not the basis for this decision. Pinned OpenCascade conversion validates
+both B-rep solids and outward closed triangulations; it does not certify physical
+manufacturing tolerance or repeatability.
+
+The fixture has a 90 × 90 mm QR recess: X [-150,-60] mm, Z [60,150] mm,
+floor Y=7.6 mm, surrounding top Y=8.0 mm. Its versioned origin is (-105,7.6,105)
+mm; local axes are +X, -Z, +Y in Fixture. Nominal Marker lies on this floor.
+Printed dimensions, placement and label/plate thickness remain unqualified.
 
 ## Authoring ownership (#46)
 
-Import using a reproducible CAD conversion/bake workflow; keep source hashes,
+The implemented reproducible CAD conversion/bake workflow keeps source hashes,
 converter/version, mm-to-m conversion and CAD-to-authored axes/pivots.
 Do not require runtime STEP parsing on Quest. Store visual mesh separately from
 bounded surface/joint proxies, seam curves and cleaning masks used for evaluation.
@@ -85,12 +92,16 @@ always invalidates output. New session requires a fresh QR registration.
 ## Physical qualification (#66)
 
 Determine and record, rather than invent:
-- actual QR location, orientation, dimensions, quiet-zone convention and print quality;
-- installed part transform, mounting orientation and repeatability after rebolting;
-- intended weld seams, surface normals and cleaning regions;
+- printed QR offset/orientation within the CAD recess, dimensions, quiet-zone
+  convention, label thickness and print quality;
+- physical deviations from nominal identity and repeatability after rebolting;
 - repeatability and absolute error across independent check positions, viewing
   distances/angles, lighting and controller tip offsets;
 - pinned Quest OS/package tuple, offline capability, drift/recenter/occlusion behavior.
+
+The source solid establishes surfaces/normals but no weld/cleaning selection.
+This separate semantic gap is explicit in `engineering/cad/selections.json`;
+obtain a drawing or approved selection rather than guessing during #66.
 
 Stable marker observations do not prove absolute spatial accuracy. Compare the
 combined marker placement, assembly fit, anchor drift and tool-tip error budget

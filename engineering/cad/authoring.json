@@ -1,0 +1,158 @@
+{
+  "schemaVersion": 1,
+  "id": "supplied-assembly-catalog",
+  "revision": 1,
+  "units": "m",
+  "fixtures": [
+    {
+      "id": "FIXTURE-001",
+      "revision": 1,
+      "sourceId": "fixture",
+      "geometryId": "fixture-geometry",
+      "markerMountRegion": {
+        "id": "QR-RECESS-001",
+        "revision": 1,
+        "widthMetres": 0.09,
+        "heightMetres": 0.09,
+        "fixtureFromRegion": {
+          "destination": "Fixture",
+          "source": "MarkerMountRegion",
+          "position": {
+            "x": -0.105,
+            "y": 0.0076,
+            "z": 0.105
+          },
+          "rotation": {
+            "x": -0.7071067811865476,
+            "y": 0,
+            "z": 0,
+            "w": 0.7071067811865476
+          },
+          "scale": 1.0
+        },
+        "outwardNormal": {
+          "x": 0.0,
+          "y": 1,
+          "z": 0.0
+        },
+        "surroundingTopMetres": 0.008,
+        "sourceFace": 14
+      }
+    }
+  ],
+  "workpieces": [
+    {
+      "id": "PART-001",
+      "revision": 1,
+      "sourceId": "welded_part",
+      "geometryId": "welded_part-geometry"
+    }
+  ],
+  "markers": [
+    {
+      "id": "MARKER-001",
+      "revision": 1,
+      "payloadPrefix": "LW1:",
+      "dimensionsKnown": false,
+      "widthMetres": 0,
+      "heightMetres": 0,
+      "quietZoneConvention": "Unqualified",
+      "physicalPlaneKnown": false,
+      "labelThicknessMetres": 0,
+      "installationEvidence": ""
+    }
+  ],
+  "bindings": [
+    {
+      "id": "ASSEMBLY-001",
+      "revision": 1,
+      "active": true,
+      "partId": "PART-001",
+      "partRevision": 1,
+      "fixtureId": "FIXTURE-001",
+      "fixtureRevision": 1,
+      "mountRevision": 1,
+      "markerId": "MARKER-001",
+      "markerRevision": 1,
+      "mountRegionId": "QR-RECESS-001",
+      "mountRegionRevision": 1,
+      "fixtureFromWorkpiece": {
+        "destination": "Fixture",
+        "source": "Workpiece",
+        "position": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "scale": 1.0
+      },
+      "fixtureFromMarker": {
+        "destination": "Fixture",
+        "source": "Marker",
+        "position": {
+          "x": -0.105,
+          "y": 0.0076,
+          "z": 0.105
+        },
+        "rotation": {
+          "x": -0.7071067811865476,
+          "y": 0,
+          "z": 0,
+          "w": 0.7071067811865476
+        },
+        "scale": 1.0
+      },
+      "qualification": "Unqualified",
+      "qualificationEvidence": "",
+      "operatorConfirmation": "Confirm PART-001 revision 1 on FIXTURE-001 revision 1, mount revision 1, correct QR label and secure fastening. Bolts do not connect the virtual electrical clamp.",
+      "invalidationInstructions": "Invalidate registration after rebolting, part/fixture movement, part change or marker relocation; register again before a new attempt."
+    }
+  ],
+  "toolSetups": [
+    {
+      "id": "RIGHT-MOCK-TOOL",
+      "revision": 1,
+      "qualified": false,
+      "evidence": "",
+      "controllerFromTool": {
+        "destination": "Controller",
+        "source": "Tool",
+        "position": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "scale": 1.0
+      },
+      "toolFromTip": {
+        "destination": "Tool",
+        "source": "Tip",
+        "position": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "scale": 1.0
+      },
+      "note": "Unknown measured offsets: identity placeholders are unavailable for use. #48/#66 author the physical right-controller tool/tip independently of virtual nozzle choice."
+    }
+  ]
+}

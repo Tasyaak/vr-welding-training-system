@@ -16,7 +16,7 @@ Run `python tests/repository_checks.py` from the repository root.
 Bootstrap already contains OVRCameraRig, MRUK, OVRPassthroughLayer and
 PrototypeDemo. It is a demo composition; the presence of MRUK does not prove
 that production QR registration is enabled or implemented.
-This documentation PR changes no scene/package/input asset.
+The #46 implementation changes no production scene/package/input asset.
 
 #49 must inspect current Scene/Anchor settings and spatial permission, enable
 MRUK QR tracker configuration and check actual QRCodeTrackingSupported state.
@@ -37,8 +37,11 @@ for the other group's scene or source types.
 evaluation, routes A/menu navigation without trigger click-through, preserves
 global B/E-stop and connects one semantic feedback/recording pipeline.
 
-For the real fixture, author QR pose/dimensions and the installed part transform.
-Do not derive exact mounting from the STEP filenames. Confirm the actual part
+For the supplied fixture, #46 authors the CAD recess and nominal identity part
+transform. #66 qualifies actual QR dimensions, thickness-adjusted plane and
+manufactured assembly deviations. Do not infer measurements from filenames.
+Use [spatial authoring](spatial-content-authoring.md) for local conversion,
+independent preview, validation and tests. Confirm the actual part
 and fastening, validate ghost placement and obtain a localized unsaved anchor
 before enabling preparation/arming. There is no four-touch-point workflow.
 

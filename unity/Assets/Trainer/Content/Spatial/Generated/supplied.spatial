@@ -1,0 +1,258 @@
+{
+  "schemaVersion": 1,
+  "id": "supplied-assembly-catalog",
+  "revision": 1,
+  "units": "m",
+  "fixtures": [
+    {
+      "id": "FIXTURE-001",
+      "revision": 1,
+      "sourceId": "fixture",
+      "geometryId": "fixture-geometry",
+      "markerMountRegion": {
+        "id": "QR-RECESS-001",
+        "revision": 1,
+        "widthMetres": 0.09,
+        "heightMetres": 0.09,
+        "fixtureFromRegion": {
+          "destination": "Fixture",
+          "source": "MarkerMountRegion",
+          "position": {
+            "x": -0.105,
+            "y": 0.0076,
+            "z": 0.105
+          },
+          "rotation": {
+            "x": -0.7071067811865476,
+            "y": 0,
+            "z": 0,
+            "w": 0.7071067811865476
+          },
+          "scale": 1.0
+        },
+        "outwardNormal": {
+          "x": 0.0,
+          "y": 1,
+          "z": 0.0
+        },
+        "surroundingTopMetres": 0.008,
+        "sourceFace": 14
+      }
+    }
+  ],
+  "workpieces": [
+    {
+      "id": "PART-001",
+      "revision": 1,
+      "sourceId": "welded_part",
+      "geometryId": "welded_part-geometry"
+    }
+  ],
+  "markers": [
+    {
+      "id": "MARKER-001",
+      "revision": 1,
+      "payloadPrefix": "LW1:",
+      "dimensionsKnown": false,
+      "widthMetres": 0,
+      "heightMetres": 0,
+      "quietZoneConvention": "Unqualified",
+      "physicalPlaneKnown": false,
+      "labelThicknessMetres": 0,
+      "installationEvidence": ""
+    }
+  ],
+  "bindings": [
+    {
+      "id": "ASSEMBLY-001",
+      "revision": 1,
+      "active": true,
+      "partId": "PART-001",
+      "partRevision": 1,
+      "fixtureId": "FIXTURE-001",
+      "fixtureRevision": 1,
+      "mountRevision": 1,
+      "markerId": "MARKER-001",
+      "markerRevision": 1,
+      "mountRegionId": "QR-RECESS-001",
+      "mountRegionRevision": 1,
+      "fixtureFromWorkpiece": {
+        "destination": "Fixture",
+        "source": "Workpiece",
+        "position": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "scale": 1.0
+      },
+      "fixtureFromMarker": {
+        "destination": "Fixture",
+        "source": "Marker",
+        "position": {
+          "x": -0.105,
+          "y": 0.0076,
+          "z": 0.105
+        },
+        "rotation": {
+          "x": -0.7071067811865476,
+          "y": 0,
+          "z": 0,
+          "w": 0.7071067811865476
+        },
+        "scale": 1.0
+      },
+      "qualification": "Unqualified",
+      "qualificationEvidence": "",
+      "operatorConfirmation": "Confirm PART-001 revision 1 on FIXTURE-001 revision 1, mount revision 1, correct QR label and secure fastening. Bolts do not connect the virtual electrical clamp.",
+      "invalidationInstructions": "Invalidate registration after rebolting, part/fixture movement, part change or marker relocation; register again before a new attempt."
+    }
+  ],
+  "toolSetups": [
+    {
+      "id": "RIGHT-MOCK-TOOL",
+      "revision": 1,
+      "qualified": false,
+      "evidence": "",
+      "controllerFromTool": {
+        "destination": "Controller",
+        "source": "Tool",
+        "position": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "scale": 1.0
+      },
+      "toolFromTip": {
+        "destination": "Tool",
+        "source": "Tip",
+        "position": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "scale": 1.0
+      },
+      "note": "Unknown measured offsets: identity placeholders are unavailable for use. #48/#66 author the physical right-controller tool/tip independently of virtual nozzle choice."
+    }
+  ],
+  "bakeInputs": [
+    {
+      "path": "tools/cad/bake.py",
+      "sha256": "e8d5d159d09116bfd55b751f734d1a60962c520dd51cb2d373a8b6e305a649d9"
+    },
+    {
+      "path": "tools/cad/inspect_step.py",
+      "sha256": "c4e23d6de7cbb7ad2150dc4944bf42e222c7c1b23f0efa964f4500b198bc6d61"
+    },
+    {
+      "path": "tools/cad/requirements.txt",
+      "sha256": "562b2f70361a1f82a8c9a3a1c82bb6c6daca93a70bb6642ed60f5e46687f9980"
+    },
+    {
+      "path": "engineering/cad/authoring.json",
+      "sha256": "90ac2b919e735ec1d81669e05f45b8b26582dbaf17cb6733af21d2470489ae3a"
+    },
+    {
+      "path": "engineering/cad/selections.json",
+      "sha256": "1ad438b4594121b15ce166492f7a253e9d6c28f34aaf7b2c36453c6c72bd127e"
+    }
+  ],
+  "sources": [
+    {
+      "id": "fixture",
+      "path": "engineering/cad/source/fixture.step",
+      "sha256": "f4532e591b0d7150a2988378a24e992b930580ca06074af60d434a7f6542d04c",
+      "revision": 1,
+      "units": "mm"
+    },
+    {
+      "id": "welded_part",
+      "path": "engineering/cad/source/welded_part.step",
+      "sha256": "647e8ce51ce0f02cda545677b969d484517b526841dc4e88a75a8829103f1117",
+      "revision": 1,
+      "units": "mm"
+    }
+  ],
+  "imports": [
+    {
+      "sourceId": "fixture",
+      "converter": "cadquery-ocp-novtk",
+      "converterVersion": "7.9.3.1.1",
+      "millimetresToMetres": 0.001,
+      "axisMap": "x,y,z",
+      "pivot": "shared CAD origin",
+      "authoredFromCadMetres": {
+        "destination": "Fixture",
+        "source": "CadMetres",
+        "position": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "scale": 1.0
+      },
+      "chordToleranceMetres": 5e-05,
+      "angularToleranceRadians": 0.1,
+      "geometryFile": "fixture.geometry.json",
+      "geometrySha256": "432839c8c55fc9502e1852b0d4f4a7a8d399954ad21c58ed96615acb6040b5dd",
+      "visualFile": "fixture.visual.json",
+      "visualSha256": "2a49d0499895d5b4ae1daee191c02c57fe9ee6f941a9e00896b0f3132859ecb7"
+    },
+    {
+      "sourceId": "welded_part",
+      "converter": "cadquery-ocp-novtk",
+      "converterVersion": "7.9.3.1.1",
+      "millimetresToMetres": 0.001,
+      "axisMap": "x,y,z",
+      "pivot": "shared CAD origin",
+      "authoredFromCadMetres": {
+        "destination": "Workpiece",
+        "source": "CadMetres",
+        "position": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "scale": 1.0
+      },
+      "chordToleranceMetres": 5e-05,
+      "angularToleranceRadians": 0.1,
+      "geometryFile": "welded_part.geometry.json",
+      "geometrySha256": "428f14b0d1c00200652e6bd8c0c445e8e5004ab70b96dff203810a0fbf6c46f4",
+      "visualFile": "welded_part.visual.json",
+      "visualSha256": "c51e15b99cec817ae09a25a32ecbcf6723e15f16de104e13366979b8e746cfba"
+    }
+  ]
+}
