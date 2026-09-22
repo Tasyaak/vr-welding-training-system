@@ -61,7 +61,7 @@ def run_spatial_tests(errors: list[str]) -> None:
         environment = dict(os.environ, DOTNET_CLI_TELEMETRY_OPTOUT='1', DOTNET_NOLOGO='1')
         project = ROOT / 'tests/Spatial.Tests'
         build = subprocess.run(
-            [dotnet, 'build', str(project), '--nologo', f'-p:TargetFramework={framework}'],
+            [dotnet, 'build', str(project), '--nologo', f'-p:SpatialTargetFramework={framework}'],
             cwd=ROOT, env=environment, text=True, stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT, timeout=120, check=False,
         )
