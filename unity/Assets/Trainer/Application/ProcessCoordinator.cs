@@ -132,11 +132,12 @@ namespace WeldingTrainer.Application
             if (!registration.Available) reasons |= InhibitReason.MissingRegistration;
             else if (!registration.Valid) reasons |= InhibitReason.RegistrationInvalid;
             else if (_registrationGeneration != 0 && registration.Generation != _registrationGeneration)
-                reasons |= InhibitReason.RegistrationChanged;
+            { reasons |= InhibitReason.RegistrationChanged; _clamp = ClampState.Disconnected; }
             if (!input.HeadValid) reasons |= InhibitReason.HeadTrackingInvalid;
             if (!input.ToolValid) reasons |= InhibitReason.ToolTrackingInvalid;
             if (string.IsNullOrWhiteSpace(_nozzleId)) reasons |= InhibitReason.NozzleUnknown;
-            else if (_attempt != null && !string.Equals(_nozzleId, _attempt.Profile.RequiredNozzleId, StringComparison.Ordinal))
+            else if (_attempt != null && (!NozzleCompatibility.IsCompatible(_attempt.Mode,_nozzleId) ||
+                !string.Equals(_nozzleId, _attempt.Profile.RequiredNozzleId, StringComparison.Ordinal)))
                 reasons |= InhibitReason.NozzleMismatch;
             if (_clamp != ClampState.Connected) reasons |= InhibitReason.ClampDisconnected;
             if (_recorder.Health != RecorderHealth.Ready) reasons |= InhibitReason.RecorderUnavailable;
@@ -158,9 +159,10 @@ namespace WeldingTrainer.Application
             if (_lifecycle == SessionLifecycle.Running &&
                 (reasons & (InhibitReason.RegistrationInvalid | InhibitReason.RegistrationChanged |
                  InhibitReason.MissingInput | InhibitReason.MissingRegistration | InhibitReason.ToolTrackingInvalid |
-                 InhibitReason.HeadTrackingInvalid | InhibitReason.MaximumSampleGapExceeded)) != 0)
+                 InhibitReason.HeadTrackingInvalid | InhibitReason.MaximumSampleGapExceeded |
+                 InhibitReason.SafetyRejected)) != 0)
             {
-                _activation = ActivationState.Inhibited;
+                _activation = ActivationState.Inhibited; _triggerReleaseRequired = true;
                 Transition(SessionLifecycle.Suspended, ProcessEventType.Suspended, reasons.ToString());
             }
 
@@ -209,7 +211,10 @@ namespace WeldingTrainer.Application
                     Emit(ProcessEventType.Disarmed, "explicit-disarm", command.TimestampSeconds); break;
                 case ProcessCommandType.DisconnectClamp:
                     if (_clamp == ClampState.Disconnected) break;
-                    RequireMutablePreparation(); _clamp = ClampState.Disconnected; Emit(ProcessEventType.ClampChanged, "disconnected", command.TimestampSeconds); break;
+                    _clamp = ClampState.Disconnected; _triggerReleaseRequired = input.TriggerPressed;
+                    if (_lifecycle == SessionLifecycle.Running)
+                    { _activation = ActivationState.Inhibited; Transition(SessionLifecycle.Suspended, ProcessEventType.Suspended, "clamp-disconnected"); }
+                    Emit(ProcessEventType.ClampChanged, "disconnected", command.TimestampSeconds); break;
                 case ProcessCommandType.ConnectClamp:
                     if (_clamp == ClampState.Connected) break;
                     RequireMutablePreparation(); _clamp = ClampState.Connected; Emit(ProcessEventType.ClampChanged, "connected", command.TimestampSeconds); break;
@@ -237,7 +242,7 @@ namespace WeldingTrainer.Application
 
         private void RequireMutablePreparation()
         {
-            if (_lifecycle == SessionLifecycle.Running || _activation == ActivationState.Armed || _activation == ActivationState.Active)
+            if (_lifecycle == SessionLifecycle.Running || _activation != ActivationState.Disarmed)
                 throw new InvalidOperationException("Disarm and leave Running before changing preparation state.");
         }
 
@@ -276,7 +281,7 @@ namespace WeldingTrainer.Application
         {
             Current = new ProcessSnapshot(++_snapshotSequence, now, _sessionId, _attempt?.AttemptId,
                 _lifecycle, _activation, _attempt?.Mode, _attempt?.SeamId, _nozzleId,
-                _clamp, _registrationGeneration, _inputGeneration, _reasons, _faults.ToArray());
+                _clamp, _registrationGeneration, _inputGeneration, _reasons, input.TriggerPressed, _faults.ToArray());
             _snapshotSink.Publish(Current); SnapshotChanged?.Invoke(Current);
         }
 

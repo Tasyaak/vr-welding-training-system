@@ -77,6 +77,11 @@ provider inhibits simulated activation. Recovery requires stable inputs, trigger
 release and explicit re-arm; faults never clear merely because a frame became
 valid again.
 
+Virtual clamp preparation and finite-surface contact are independent prerequisites. The unified
+activation reducer is the only authority for simulated output and publishes every blocking reason
+plus a prioritized reason. Missing reflection or process-prerequisite providers fail closed. See
+[unified-activation-interlock.md](unified-activation-interlock.md).
+
 ## Units and determinism
 
 - metres, seconds and metres/second in Domain;

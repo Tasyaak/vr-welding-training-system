@@ -19,5 +19,11 @@ namespace WeldingTrainer.Domain
             a.W*b.Y - a.X*b.Z + a.Y*b.W + a.Z*b.X,
             a.W*b.Z + a.X*b.Y - a.Y*b.X + a.Z*b.W,
             a.W*b.W - a.X*b.X - a.Y*b.Y - a.Z*b.Z);
+
+        public static RigidPose Inverse(RigidPose pose)
+        {
+            var inverseRotation=new Quaterniond(-pose.Rotation.X,-pose.Rotation.Y,-pose.Rotation.Z,pose.Rotation.W);
+            return new RigidPose(Rotate(inverseRotation,pose.PositionMetres*-1),inverseRotation);
+        }
     }
 }

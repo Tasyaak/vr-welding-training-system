@@ -73,8 +73,11 @@ namespace WeldingTrainer.Application
     {
         public readonly bool Available, Allowed;
         public readonly InhibitReason Reasons;
+        public readonly ContactEvidence Contact;
         public SafetyDecision(bool available, bool allowed, InhibitReason reasons)
-        { Available = available; Allowed = allowed; Reasons = reasons; }
+        { Available = available; Allowed = allowed; Reasons = reasons; Contact = default; }
+        public SafetyDecision(bool available,bool allowed,InhibitReason reasons,ContactEvidence contact)
+        {Available=available;Allowed=allowed;Reasons=reasons;Contact=contact;}
         public static SafetyDecision Missing => new(false, false, InhibitReason.SafetyProviderUnavailable);
     }
 
@@ -115,6 +118,9 @@ namespace WeldingTrainer.Application
         void DestroyAnchor();
     }
     public interface IActivationSafetyPort { SafetyDecision Evaluate(EvaluationRequest request); }
+    public enum RiskDisposition { Unknown, Safe, Unsafe }
+    public interface IProspectiveRiskPort { RiskDisposition Evaluate(EvaluationRequest request, ContactEvidence contact); }
+    public interface IProcessPrerequisitePort { InhibitReason Evaluate(EvaluationRequest request, ContactEvidence contact); }
     public interface IProcessSnapshotSink { void Publish(ProcessSnapshot snapshot); }
     public interface IHapticLifecyclePort { void StopImmediately(); }
 

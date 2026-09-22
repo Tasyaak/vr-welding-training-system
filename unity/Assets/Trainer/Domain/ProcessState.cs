@@ -32,7 +32,15 @@ namespace WeldingTrainer.Domain
         EmergencyStopLatched = 1UL << 12,
         TriggerReleaseRequired = 1UL << 13,
         SessionNotRunning = 1UL << 14,
-        MaximumSampleGapExceeded = 1UL << 15
+        MaximumSampleGapExceeded = 1UL << 15,
+        ContactInvalid = 1UL << 16,
+        OutsideFiniteSurface = 1UL << 17,
+        WrongApproachSide = 1UL << 18,
+        SurfaceAmbiguous = 1UL << 19,
+        ReflectionUnknown = 1UL << 20,
+        ReflectionUnsafe = 1UL << 21,
+        UnsupportedProcess = 1UL << 22,
+        ProcessPrerequisiteMissing = 1UL << 23
     }
 
     public sealed class ProcessFault
@@ -74,16 +82,33 @@ namespace WeldingTrainer.Domain
         public long RegistrationGeneration { get; }
         public long InputGeneration { get; }
         public InhibitReason InhibitReasons { get; }
+        public InhibitReason PrimaryInhibitReason { get; }
+        public bool ProcessRequested { get; }
+        public bool PermissionGranted => Activation == ActivationState.Armed || Activation == ActivationState.Active;
         public IReadOnlyList<ProcessFault> Faults => Array.AsReadOnly(_faults);
 
         public ProcessSnapshot(long sequence, double time, string sessionId, string attemptId,
             SessionLifecycle lifecycle, ActivationState activation, ProcessMode? mode,
             string seamId, string nozzleId, ClampState clamp, long registrationGeneration,
-            long inputGeneration, InhibitReason reasons, ProcessFault[] faults)
+            long inputGeneration, InhibitReason reasons, bool processRequested, ProcessFault[] faults)
         { Sequence = sequence; MonotonicSeconds = time; SessionId = sessionId;
           AttemptId = attemptId; Lifecycle = lifecycle; Activation = activation; Mode = mode;
           SeamId = seamId; NozzleId = nozzleId; Clamp = clamp;
           RegistrationGeneration = registrationGeneration; InputGeneration = inputGeneration;
-          InhibitReasons = reasons; _faults = faults == null ? Array.Empty<ProcessFault>() : (ProcessFault[])faults.Clone(); }
+          InhibitReasons = reasons; PrimaryInhibitReason = Primary(reasons); ProcessRequested=processRequested;
+          _faults = faults == null ? Array.Empty<ProcessFault>() : (ProcessFault[])faults.Clone(); }
+
+        private static InhibitReason Primary(InhibitReason reasons)
+        {
+            InhibitReason[] priority={InhibitReason.EmergencyStopLatched,InhibitReason.ReflectionUnsafe,
+                InhibitReason.ReflectionUnknown,InhibitReason.RegistrationInvalid,InhibitReason.RegistrationChanged,
+                InhibitReason.MissingRegistration,InhibitReason.MissingInput,InhibitReason.HeadTrackingInvalid,
+                InhibitReason.ToolTrackingInvalid,InhibitReason.RecorderUnavailable,InhibitReason.NozzleUnknown,
+                InhibitReason.NozzleMismatch,InhibitReason.ClampDisconnected,InhibitReason.ContactInvalid,
+                InhibitReason.ProcessPrerequisiteMissing,InhibitReason.TriggerReleaseRequired};
+            foreach(InhibitReason reason in priority)if((reasons&reason)!=0)return reason;
+            return reasons==InhibitReason.None?InhibitReason.None:
+                (InhibitReason)((ulong)reasons & (0UL-(ulong)reasons));
+        }
     }
 }

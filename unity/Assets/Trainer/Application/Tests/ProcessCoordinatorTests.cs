@@ -81,6 +81,15 @@ namespace WeldingTrainer.Application.Tests
         }
 
         [Test]
+        public void DisconnectingClampWhileRunningSuspendsImmediately()
+        {
+            PrepareRunning(); SubmitNow(ProcessCommandType.DisconnectClamp); _coordinator.Tick();
+            Assert.That(_coordinator.Current.Lifecycle,Is.EqualTo(SessionLifecycle.Suspended));
+            Assert.That(_coordinator.Current.Clamp,Is.EqualTo(ClampState.Disconnected));
+            Assert.That(_coordinator.Current.Activation,Is.EqualTo(ActivationState.Inhibited));
+        }
+
+        [Test]
         public void ProcessChangeWhileRunningIsRejected()
         {
             PrepareRunning();
@@ -160,6 +169,36 @@ namespace WeldingTrainer.Application.Tests
             Assert.That(calibration.Capture(2).Valid, Is.False);
         }
 
+        [Test]
+        public void UnifiedSafetyRequiresFiniteContactAndKnownSafeRisk()
+        {
+            ContentSnapshot content=TestContent.Create(); ProcessProfile profile=content.Entry.Profiles.Single(x=>x.Settings.Mode==ProcessMode.Fusion);
+            var attempt=new AttemptConfiguration("a","seam-a",ProcessMode.Fusion,profile,content,null);
+            var validPose=new TrackedPoseSnapshot(new RigidPose(new Vector3d(0,.001,0),Quaterniond.Identity),true,true,true);
+            var input=new InputSnapshot(true,validPose,validPose,validPose,validPose,0,false,InputCommandEdges.None,InputContext.Training,1,1);
+            var registration=new RegistrationSnapshot(true,true,1,RegistrationWorkflowState.Registered,RigidPose.Identity,RigidPose.Identity,null);
+            var safety=new UnifiedActivationSafety(new SafeRisk(),new NoPrerequisites());
+            Assert.That(safety.Evaluate(new EvaluationRequest(1,input,registration,attempt)).Allowed,Is.True);
+            var outside=new TrackedPoseSnapshot(new RigidPose(new Vector3d(2,.001,0),Quaterniond.Identity),true,true,true);
+            input=new InputSnapshot(true,outside,outside,outside,outside,0,false,InputCommandEdges.None,InputContext.Training,1,2);
+            SafetyDecision blocked=safety.Evaluate(new EvaluationRequest(2,input,registration,attempt));
+            Assert.That(blocked.Allowed,Is.False);
+            Assert.That(blocked.Reasons.HasFlag(InhibitReason.OutsideFiniteSurface),Is.True);
+        }
+
+        [Test]
+        public void UnknownReflectionIsFailClosed()
+        {
+            ContentSnapshot content=TestContent.Create();ProcessProfile profile=content.Entry.Profiles.First();
+            var attempt=new AttemptConfiguration("a","seam-a",profile.Settings.Mode,profile,content,null);
+            var pose=new TrackedPoseSnapshot(new RigidPose(new Vector3d(0,.001,0),Quaterniond.Identity),true,true,true);
+            var input=new InputSnapshot(true,pose,pose,pose,pose,0,false,InputCommandEdges.None,InputContext.Training,1,1);
+            var registration=new RegistrationSnapshot(true,true,1,RegistrationWorkflowState.Registered,RigidPose.Identity,RigidPose.Identity,null);
+            SafetyDecision decision=new UnifiedActivationSafety(null,new NoPrerequisites()).Evaluate(new EvaluationRequest(1,input,registration,attempt));
+            Assert.That(decision.Reasons.HasFlag(InhibitReason.ReflectionUnknown),Is.True);
+            Assert.That(decision.Allowed,Is.False);
+        }
+
         private void PrepareReady()
         {
             _coordinator.StartSession(); _registration.Snapshot = new RegistrationSnapshot(true, true, 7); _coordinator.Tick();
@@ -202,6 +241,8 @@ namespace WeldingTrainer.Application.Tests
             public void BeginCreate(RigidPose pose, long generation, Action<long, AnchorCreationResult> completed) { }
             public void DestroyAnchor() => DestroyCount++;
         }
+        private sealed class SafeRisk : IProspectiveRiskPort { public RiskDisposition Evaluate(EvaluationRequest r,ContactEvidence c)=>RiskDisposition.Safe; }
+        private sealed class NoPrerequisites : IProcessPrerequisitePort { public InhibitReason Evaluate(EvaluationRequest r,ContactEvidence c)=>InhibitReason.None; }
 
         private static class TestContent
         {
@@ -316,5 +357,53 @@ namespace WeldingTrainer.Application.Tests
         private static FixtureDefinition Fixture(Vector3d[] points)=>new("fixture",1,
             points.Select((p,i)=>new ReferencePointDefinition("p"+(i+1),p)),new Vector3d(.4,.02,.2),RigidPose.Identity,
             new CalibrationPolicy(3,.003,.005,.05,.002));
+    }
+
+    public sealed class FiniteSurfaceContactTests
+    {
+        private static readonly SurfacePatch Patch=new("plate",new[]{new Vector3d(-1,0,-1),new Vector3d(1,0,-1),new Vector3d(1,0,1),new Vector3d(-1,0,1)},new Vector3d(0,1,0),1);
+        private static WorkpieceDefinition Workpiece()=>new("w",1,new[]{Patch},Array.Empty<DirectedSeam>(),Array.Empty<TargetRegion>());
+
+        [Test]
+        public void InsideFrontFaceEntersAndUsesExitHysteresis()
+        {
+            var evaluator=new FiniteSurfaceContactEvaluator();
+            Assert.That(evaluator.Evaluate(Workpiece(),new Vector3d(0,.001,0),true,.002,.004).State,Is.EqualTo(ContactState.Contact));
+            Assert.That(evaluator.Evaluate(Workpiece(),new Vector3d(0,.003,0),true,.002,.004).State,Is.EqualTo(ContactState.Contact));
+            Assert.That(evaluator.Evaluate(Workpiece(),new Vector3d(0,.005,0),true,.002,.004).State,Is.EqualTo(ContactState.Separated));
+        }
+
+        [Test]
+        public void InfinitePlaneNearnessDoesNotPermitOutsidePatch()
+        {
+            ContactEvidence evidence=new FiniteSurfaceContactEvaluator().Evaluate(Workpiece(),new Vector3d(2,.001,0),true,.002,.004);
+            Assert.That(evidence.State,Is.Not.EqualTo(ContactState.Contact));
+            Assert.That(evidence.InvalidReason,Is.EqualTo(ContactInvalidReason.OutsideBounds));
+        }
+
+        [Test]
+        public void BacksideApproachIsRejected()
+        {
+            ContactEvidence evidence=new FiniteSurfaceContactEvaluator().Evaluate(Workpiece(),new Vector3d(0,-.001,0),true,.002,.004);
+            Assert.That(evidence.State,Is.Not.EqualTo(ContactState.Contact));
+            Assert.That(evidence.InvalidReason,Is.EqualTo(ContactInvalidReason.WrongApproach));
+        }
+
+        [Test]
+        public void RayMustHitFinitePatch()
+        {
+            Assert.That(FiniteSurfaceContactEvaluator.TryRayImpact(Patch,new Vector3d(0,1,0),new Vector3d(0,-1,0),out _),Is.True);
+            Assert.That(FiniteSurfaceContactEvaluator.TryRayImpact(Patch,new Vector3d(2,1,0),new Vector3d(0,-1,0),out _),Is.False);
+        }
+
+        [TestCase(ProcessMode.Fusion,"welding-nozzle",true)]
+        [TestCase(ProcessMode.Wobble,"welding-nozzle",true)]
+        [TestCase(ProcessMode.Pulsed,"welding-nozzle",true)]
+        [TestCase(ProcessMode.PreWeldCleaning,"cleaning-nozzle",true)]
+        [TestCase(ProcessMode.PostWeldCleaning,"cleaning-nozzle",true)]
+        [TestCase(ProcessMode.Fusion,"cleaning-nozzle",false)]
+        [TestCase(ProcessMode.PreWeldCleaning,"welding-nozzle",false)]
+        public void NozzleCompatibilityTableIsExplicit(ProcessMode mode,string nozzle,bool expected)
+            =>Assert.That(NozzleCompatibility.IsCompatible(mode,nozzle),Is.EqualTo(expected));
     }
 }

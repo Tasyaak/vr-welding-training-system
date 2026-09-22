@@ -385,6 +385,7 @@ GameObject:
   m_Component:
   - component: {fileID: 679690222}
   - component: {fileID: 679690223}
+  - component: {fileID: 679690224}
   m_Layer: 0
   m_Name: TrainerBootstrap
   m_TagString: Untagged
@@ -424,10 +425,24 @@ MonoBehaviour:
   _selectedCatalog: {fileID: 0}
   _inputProvider: {fileID: 1150042810}
   _registrationProvider: {fileID: 1150042812}
-  _safetyProvider: {fileID: 0}
+  _safetyProvider: {fileID: 679690224}
   _recorderProvider: {fileID: 0}
   _snapshotSink: {fileID: 0}
   _hapticsProvider: {fileID: 0}
+--- !u!114 &679690224
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 679690221}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 50a00000000000000000000000000004, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: WeldingTrainer.Scenes::WeldingTrainer.Scenes.UnifiedSafetyAdapter
+  _prospectiveRiskProvider: {fileID: 0}
+  _processPrerequisiteProvider: {fileID: 0}
 --- !u!1001 &1097856265
 PrefabInstance:
   m_ObjectHideFlags: 0
