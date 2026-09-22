@@ -93,6 +93,47 @@ namespace WeldingTrainer.Domain
             double.IsFinite(X) &&
             double.IsFinite(Y) &&
             double.IsFinite(Z);
+
+        public double LengthSquared =>
+            X * X + Y * Y + Z * Z;
+
+        public double Length =>
+            Math.Sqrt(LengthSquared);
+
+        public Vec3 Normalized
+        {
+            get
+            {
+                double length = Length;
+                return Finite && double.IsFinite(length) && length > 1e-12
+                    ? this / length
+                    : default;
+            }
+        }
+
+        public static Vec3 operator +(Vec3 a, Vec3 b) =>
+            new(a.X + b.X, a.Y + b.Y, a.Z + b.Z);
+
+        public static Vec3 operator -(Vec3 a, Vec3 b) =>
+            new(a.X - b.X, a.Y - b.Y, a.Z - b.Z);
+
+        public static Vec3 operator *(Vec3 value, double scalar) =>
+            new(value.X * scalar, value.Y * scalar, value.Z * scalar);
+
+        public static Vec3 operator *(double scalar, Vec3 value) =>
+            value * scalar;
+
+        public static Vec3 operator /(Vec3 value, double scalar) =>
+            new(value.X / scalar, value.Y / scalar, value.Z / scalar);
+
+        public static double Dot(Vec3 a, Vec3 b) =>
+            a.X * b.X + a.Y * b.Y + a.Z * b.Z;
+
+        public static Vec3 Cross(Vec3 a, Vec3 b) =>
+            new(
+                a.Y * b.Z - a.Z * b.Y,
+                a.Z * b.X - a.X * b.Z,
+                a.X * b.Y - a.Y * b.X);
     }
 
     public readonly struct Quat
