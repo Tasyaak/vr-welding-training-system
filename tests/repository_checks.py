@@ -83,6 +83,17 @@ def check_dev_agent_settings(errors: list[str]) -> None:
         errors.append("DevAgentSettings.asset must be disabled in source control")
 
 
+def check_training_test_isolation(errors: list[str]) -> None:
+    build = (ROOT / "unity/ProjectSettings/EditorBuildSettings.asset").read_text(encoding="utf-8")
+    if "TrainingTest/FakeTraining.unity" in build:
+        errors.append("FakeTraining scene must not be included in release Build Settings")
+    fake = ROOT / "unity/Assets/Trainer/Scenes/TrainingTest/FakeTraining.unity"
+    if fake.is_file() and fake.read_text(encoding="utf-8").count(
+        "WeldingTrainer.TrainingTest.FakeTrainingComposition"
+    ) != 1:
+        errors.append("FakeTraining scene must contain exactly one fake composition")
+
+
 def main() -> int:
     tracked = tracked_files()
     tracked_set = set(tracked)
@@ -106,6 +117,7 @@ def main() -> int:
 
     check_build_scenes(errors)
     check_dev_agent_settings(errors)
+    check_training_test_isolation(errors)
 
     scene_path = ROOT / "unity/Assets/Trainer/Scenes/Bootstrap.unity"
     if scene_path.is_file():
