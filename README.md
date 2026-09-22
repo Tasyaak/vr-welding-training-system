@@ -1,54 +1,71 @@
 # VR Welding Training System
 
-Standalone Meta Quest 3 mixed-reality training for handheld laser-welding processes.
+Standalone Meta Quest 3 mixed-reality training for handheld laser welding.
 
 ## Approved MVP
 
-The MVP uses one right Touch Plus controller rigidly attached to a mock tool, a
-stationary fixture, four-point fixture calibration, local deterministic
-evaluation, virtual nozzle/clamp state, geometric contact, software emergency
-stop and reflection-risk training. It supports Fusion, Wobble, Pulsed, and
-pre/post-weld cleaning workflows.
+One right Touch Plus controller is rigidly attached to a non-functional mock
+tool. A welding part is bolted to a stationary fixture. A QR code carrying the
+workpiece ID is fixed at a documented location and orientation on that fixture.
+Its tracked pose and versioned marker/assembly offsets establish the workpiece
+frame; decoding an ID alone does not establish a pose.
 
-The runtime is Quest-only. It has no QR registration, external sensor,
-microcontroller, network peer, magnet, electromagnetic actuator, physical clamp,
-second-controller workflow, or copied commercial-machine interface.
+The application supports Fusion, Wobble, Pulsed, pre-weld cleaning and post-weld
+cleaning, with a virtual nozzle change, virtual workpiece-clamp state, geometric
+contact, a right-button software E-stop, conservative reflection-risk training,
+semantic MR/audio/right-controller haptics and deterministic local recording.
 
-## Current repository state
+Fixture registration uses QR observations and a session-only anchor. The former
+four-point touch registration is superseded; no touch-calibration fallback is
+required. Calibrating the tool's fixed tip offset remains a separate setup task.
+Bolts secure the assembly mechanically; they are not the simulated electrical
+clamp/contact circuit and are not automatically sensed.
 
-- `unity/Assets/Trainer/Development/Prototype/` contains the integrated
-  presentation prototype.
-- `unity/Assets/Trainer/Scenes/Bootstrap.unity` contains the Quest XR,
-  passthrough, MRUK and prototype scene composition.
-- `docs/` defines the production architecture and ordered implementation plan.
-- Production Domain/Application modules are planned in Issues #46–#58 and are
-  not yet integrated into `main`.
+No ESP32, Hall sensor, magnets, coil, external runtime network peer, physical
+electrical clamp, left-controller workflow or copied commercial-machine UI is
+part of the MVP. Training works offline after installation.
 
-Pending pull requests are proposals, not proof that their files are in `main`.
-See `docs/quest-only-migration.md` for the Issue/PR adoption matrix.
+## Current implementation
 
-## Software
+Audited main: `ee8999eb4562c9f0c77e66b5b38acdfab1a7dea2`.
 
-- Unity `6000.3.24f1`
-- Meta XR Core and MR Utility Kit `205.0.0`
-- Unity OpenXR `1.16.1`
-- Android Build Support for standalone Quest deployment
+The integrated code is `unity/Assets/Trainer/Development/Prototype/PrototypeWeldingDemo.cs`
+and the Bootstrap scene with OVRCameraRig, MRUK and passthrough. The prototype
+uses a camera-relative straight seam and does not implement production QR
+registration, process state or persistence. The production layers are planned,
+not already shipped. Existing unmerged PRs are not prerequisites for this plan.
 
-Open the existing `unity` directory in Unity Hub; do not create another Unity
-project. Then open `Assets/Trainer/Scenes/Bootstrap.unity`.
+## Parallel delivery
 
-## Validation
+[Roadmap](docs/roadmap.md) defines two independent implementation groups:
 
-```text
-python tests/repository_checks.py
-```
+- **A — Spatial setup:** #46 content/CAD, #48 right input, #49 QR registration,
+  and #66 station qualification.
+- **B — Training engine and experience:** #47 state/contracts, #10 evaluation,
+  #50–#56 process/safety, #14–#17 feedback/coverage/storage, and #57 menu.
+- **#58 Integration** joins A and B and qualifies the complete Quest workflow.
 
-Then run Unity compilation and the Quest smoke-test procedure in
-`docs/setup.md`. Device results must be recorded as evidence; Editor Play Mode
-does not validate passthrough, tracking, permissions, anchors or performance.
+Both groups start from the [boundary contract](docs/parallel-development-contract.md)
+and their own test fixtures; B does not wait for live QR or the actual CAD assets.
 
-## Safety boundary
+## Open and validate
 
-This is a training aid. It never controls or authorizes a real laser. Software
-activation, contact, reflection and emergency-stop states are simulated and
-must fail closed when required tracking, calibration or session state is invalid.
+Use Unity `6000.3.24f1`, Android Build Support, Meta Core/MRUK `205.0.0`
+and OpenXR `1.16.1`. Open the existing `unity` directory in Unity Hub,
+then `Assets/Trainer/Scenes/Bootstrap.unity`. Keep package versions pinned.
+
+Run `python tests/repository_checks.py`; follow [setup](docs/setup.md)
+for Unity and standalone Quest validation. Documentation changes do not enable
+QR tracking in the scene. The actual configuration is part of #49.
+
+## Architecture and evidence
+
+- [Project description](docs/laser-welding-training-project-description.md)
+- [Architecture](docs/architecture.md) and [coordinate conventions](docs/coordinate-conventions.md)
+- [CAD and fixture registration](docs/fixture-cad-and-registration.md)
+- [Migration history](docs/quest-only-migration.md)
+- [Prototype runbook](docs/tomorrow-prototype-runbook.md)
+
+This is a training aid, not a real laser controller or a real-world Class 4
+laser safety calculation. Unknown tracking, registration, assembly readiness
+or safety evidence inhibits simulated output.

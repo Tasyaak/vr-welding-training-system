@@ -1,71 +1,105 @@
-# Quest-only laser-welding training MVP
+# Handheld laser-welding training MVP
 
-## Purpose
+## Purpose and implementation status
 
-The system is a standalone Meta Quest 3 mixed-reality training aid for handheld
-laser-welding techniques. A right Touch Plus controller is rigidly attached to
-a non-functional mock tool. The application overlays guidance on a stationary
-physical fixture, evaluates motion locally and records deterministic sessions.
+A standalone Quest 3 MR application trains tool movement, process preparation
+and response to simulated faults. A right Touch Plus is rigidly mounted in a
+non-functional handheld laser-head mock-up. Passthrough shows the real stationary
+fixture and a welding part bolted to it.
 
-It does not control a real laser and is not a physical safety interlock.
+Audited main ee8999e contains the presentation prototype and XR scene, not the
+production feature set described here. Existing unmerged PRs are not inputs or
+dependencies of this revised implementation plan.
 
-## Approved equipment and interaction
+## Registration and mechanical setup
 
-- Meta Quest 3 with passthrough;
-- one right Touch Plus controller and mock tool attachment;
-- stationary fixture/workpiece with four known calibration points;
-- virtual clamp and explicit virtual nozzle selection;
-- right-controller MR menu and software emergency stop.
+A QR code is fixed at an authored position/orientation on the fixture and carries
+the welding-part ID. A bounded local catalog binding selects the fixture, part,
+mounting revision, printed marker dimensions and rigid offsets. Marker pose plus
+those offsets establishes the part pose; the ID alone does not.
 
-No runtime path uses QR markers, external microcontrollers, sensors, magnets,
-coils, network telemetry, a physical clamp, or the left controller.
+The part is mechanically secured with bolts. Before accepting registration the
+trainee confirms the actual part/revision and secured mounting, and checks the
+ghost model. The system does not sense bolt tightness or authenticate part
+identity. Mechanical fastening is separate from the virtual electrical clamp.
 
-## Training modes
+Use repeated stable MRUK observations, known marker dimensions, explicit
+quality/age gates and an unsaved session anchor. QR occlusion after successful
+registration is allowed while the anchor stays valid. Do not continually snap
+the workpiece to noisy QR poses. Changing/rebolting the part, moving the fixture
+or relocating the marker requires invalidation and a new registration/attempt.
+Every new session registers again.
 
-1. Fusion welding on a shared directed seam evaluator.
-2. Wobble welding with a time-based scan and footprint coverage.
-3. Pulsed welding with deterministic ON/OFF windows.
-4. Pre-weld cleaning with explicit cleaning-nozzle selection.
-5. Post-weld cleaning with explicit cleaning-nozzle selection.
+Four-point touch registration is superseded. Tool-to-tip calibration remains
+an independent physical setup requirement. See [CAD/registration](fixture-cad-and-registration.md)
+for source-model evidence, unknown installation parameters and qualification.
 
-All modes share calibrated local geometry, tracking validity, finite-surface
-contact, coverage, reflection-risk evaluation, E-stop and recording.
+## Modes and shared semantics
 
-## Safety model
+| Mode | Training behavior |
+| --- | --- |
+| Fusion | Continuous output during permitted trigger intervals |
+| Wobble | Tracked center path plus timestamp-based lateral beam scan; render an envelope when appropriate |
+| Pulsed | Deterministic half-open ON windows; OFF travel contributes no output |
+| Pre-weld cleaning | Sweep authored contamination/required regions; track acceptable and attempted area |
+| Post-weld cleaning | Sweep a frozen weld-derived or explicitly authored target area |
 
-Simulated process activation is allowed only when the session is running,
-calibration and tracking are valid, the selected virtual nozzle/process matches,
-the virtual clamp is applied, contact and process conditions are acceptable,
-the trigger is intentionally pressed, E-stop is clear and no latched reflection
-fault exists. Any missing condition fails closed with an explicit reason.
+No mode predicts penetration, metallurgy, temperature or real optical power.
+Wobble does not ask the trainee to zigzag and does not forgive centerline errors.
+Pulse/wobble semantics depend on monotonic time, not rendering FPS. Cleaning
+keeps missed regions, overlap/repeated passes, speed and pose constraints.
 
-Recovery requires stable state, trigger release and explicit re-arm. E-stop and
-defined reflection faults latch until their reset workflow succeeds.
+Welding modes require WeldingNozzle; cleaning requires CleaningNozzle.
+Changing nozzle is an explicit disarmed virtual transaction, not physical
+recognition and not a change to the calibrated real tip offset. Process/profile
+changes require a new frozen attempt configuration.
 
-## Geometry and data
+## Activation, safety and controls
 
-Content is versioned: fixture points, finite surfaces, seams, normals, tool/tip
-offsets, nozzle profiles and process parameters. Evaluation runs in
-fixture/workpiece-local coordinates using metres, seconds and radians. Inspector
-and trainee UI may display degrees only through explicit conversion.
+One application/domain decision combines session state, registration and
+assembly confirmation, current tool/head/system validity, trigger, virtual
+clamp, finite-surface geometric contact, mode/nozzle compatibility, E-stop,
+reflection state and recording health. Unknown required input inhibits.
+Signed standoff, permitted approach side, finite bounds and real normals define
+contact; distance to an infinite plane or seam alone is insufficient.
 
-Each recording includes content/evaluator versions, monotonic inputs, state
-transitions, calibration generation/residuals, process timing, coverage,
-interlock reasons and summary metrics. Replay must reproduce decisions without
-Unity scene-object identity or participant personal data.
+Right trigger requests output; B is a short-press global latched E-stop; A
+confirms UI/registration preview; thumbstick navigates and its click requests
+menu/pause. Grip is reserved. The left controller is unnecessary. Opening menu
+inhibits/disarms before input focus changes. Closing it never resumes held-trigger
+output. Release, valid conditions and explicit re-arm are required; faults also
+need acknowledgement/reset.
 
-## Failure behavior
+Back-reflection uses incident direction and the real surface normal with
+r=d-2(d dot n)n, a conservative training cone and tracked head danger volume.
+Unknown is not Low/Safe; confirmed trips latch. Risk parameters are training
+approximations, not measured reflectivity or real-world Class 4 safety approval.
 
-- tracking/calibration/contact loss: inhibit immediately;
-- recenter/resume: revalidate the same session anchor before continuing;
-- E-stop: latch, stop feedback/activation and require reset plus re-arm;
-- reflection risk: conservatively inhibit and latch when specified;
-- storage pressure/crash: mark incomplete data and preserve committed records;
-- missing optional feedback sink: continue scoring, report degraded feedback;
-- missing mandatory provider: do not start or arm the process.
+## Evaluation, feedback and evidence
 
-## Delivery state
+Evaluate directed seam progress, signed along-seam speed, lateral/normal error,
+orientation and continuity in Workpiece coordinates. Separate attempted and
+acceptable coverage; never bridge missing/blocked intervals or double-count
+revisits. Keep cleaning area and weld-length denominators distinct.
 
-`main` currently contains the presentation prototype and Quest scene. Production
-features are implemented in order by Issues #46–#58. Historical external-device
-design is intentionally retired; see `quest-only-migration.md`.
+One semantic state drives visuals/audio/right-controller haptics. Assistance
+0–100% affects coaching only; mandatory status and objective metrics remain.
+Presentation never determines whether simulated output is allowed.
+
+Record immutable content/profile versions, marker/assembly binding, registration
+generation and observation quality, head/tool/trigger validity, ordered commands,
+faults, pulse/wobble epochs, coverage and results. Use bounded local journals,
+crash-aware finalization and explicit incomplete state on evidence loss.
+Replay must reproduce model decisions from the consumed timestamped inputs;
+display-rate samples alone are insufficient.
+
+## Delivery and limits
+
+[Roadmap](roadmap.md) separates independently implementable A/B groups and #58
+integration using [contract v1](parallel-development-contract.md). A uses the
+provided STEP references; B uses synthetic geometry and fake ports. Neither
+group's merge requires the other group's implementation.
+
+No ESP32/Hall/magnets/coil/external network peer, sensed physical electrical
+clamp, second controller, account/backend or commercial panel copy is included.
+The application is a training aid and never controls a real laser.
