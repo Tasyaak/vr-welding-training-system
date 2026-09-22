@@ -617,7 +617,8 @@ namespace WeldingTrainer.Application.Tests
                 Is.EqualTo(ActivationState.ResetRequired));
 
             // Restore prerequisites; reset succeeds but remains suspended until Resume.
-            safety.Value = new SafetyInput(true, true, false, BlockReason.None);
+            safety.Value = new SafetyInput(true, false, true, true, false,
+                    new ContactEvidence(ContactState.Contact, ContactReason.None, "synthetic", default, new Vec3(0, 0, 1), 0, 0, true, true), RiskState.Low, BlockReason.None);
             coordinator.Submit(TrainingCommandType.ResetEmergencyStop, clock.Seconds);
             coordinator.Tick();
 
@@ -699,6 +700,106 @@ namespace WeldingTrainer.Application.Tests
                 coordinator.Current.Clamp,
                 Is.EqualTo(ClampState.Disconnected));
             Assert.That(sink.Last.Permission, Is.False);
+        }
+
+        [TestCase("contact", BlockReason.ContactInvalid)]
+        [TestCase("menu", BlockReason.MenuOpen)]
+        [TestCase("unknown", BlockReason.ReflectionUnknown)]
+        [TestCase("high", BlockReason.ReflectionUnsafe)]
+        [TestCase("tool", BlockReason.ToolInvalid)]
+        [TestCase("head", BlockReason.HeadInvalid)]
+        [TestCase("system", BlockReason.SystemInvalid)]
+        [TestCase("input", BlockReason.InputUnavailable)]
+        [TestCase("fault", BlockReason.FaultLatched)]
+        [TestCase("assembly", BlockReason.AssemblyUnconfirmed)]
+        [TestCase("binding", BlockReason.BindingMismatch)]
+        [TestCase("process", BlockReason.ProcessPrerequisiteMissing)]
+        public void ValidityLossStopsSameTickAndRequiresReleaseResumeArm(string loss, BlockReason reason)
+        {
+            Ready();
+            PrepareAndArm();
+            input.Value = Valid(true);
+            coordinator.Tick();
+            Assert.That(coordinator.Current.Activation, Is.EqualTo(ActivationState.Active));
+            SafetyInput good = safety.Value;
+            int stops = haptics.Count;
+            safety.Value = new SafetyInput(true, loss == "fault", loss != "assembly", loss != "binding",
+                loss == "menu", loss == "contact" ? default : good.Contact,
+                loss == "unknown" ? RiskState.Unknown : loss == "high" ? RiskState.High : RiskState.Low,
+                loss == "process" ? BlockReason.ProcessPrerequisiteMissing : BlockReason.None);
+            input.Value = new TrainingInput(clock.Seconds, 1, 3, loss != "input", loss != "head",
+                loss != "tool", true, false, false, loss == "system");
+            coordinator.Tick();
+            Assert.That(coordinator.Current.Permission, Is.False);
+            Assert.That(coordinator.Current.Session, Is.EqualTo(SessionState.Suspended));
+            Assert.That(coordinator.Current.Reasons.HasFlag(reason), Is.True);
+            Assert.That(coordinator.Current.PrimaryReason, Is.Not.EqualTo(BlockReason.None));
+            Assert.That(haptics.Count, Is.GreaterThan(stops));
+            if (loss == "fault") Assert.That(coordinator.Current.Activation, Is.EqualTo(ActivationState.ResetRequired));
+
+            // A provider clears its own latched fault only after its reset acknowledgement (#51).
+            safety.Value = good;
+            input.Value = Valid(true);
+            coordinator.Submit(TrainingCommandType.Resume, clock.Seconds);
+            coordinator.Tick();
+            coordinator.Submit(TrainingCommandType.Arm, clock.Seconds);
+            coordinator.Tick();
+            Assert.That(coordinator.Current.Permission, Is.False);
+            input.Value = Valid(false, true);
+            coordinator.Tick();
+            Assert.That(coordinator.Current.Permission, Is.False);
+            input.Value = Valid(true);
+            coordinator.Tick();
+            Assert.That(coordinator.Current.Permission, Is.False, "release alone must not restore permission");
+            input.Value = Valid(false, true);
+            coordinator.Tick();
+            coordinator.Submit(TrainingCommandType.Arm, clock.Seconds);
+            coordinator.Tick();
+            Assert.That(coordinator.Current.Activation, Is.EqualTo(ActivationState.Armed));
+            input.Value = Valid(true);
+            coordinator.Tick();
+            Assert.That(coordinator.Current.Activation, Is.EqualTo(ActivationState.Active));
+        }
+
+        [TestCase(true)]
+        [TestCase(false)]
+        public void ArmUsesTheSameContactAndClampDecision(bool missingContact)
+        {
+            Ready(); Prepare();
+            if (missingContact)
+                safety.Value = new SafetyInput(true, false, true, true, false, default, RiskState.Low, BlockReason.None);
+            else
+                coordinator.Submit(TrainingCommandType.DisconnectClamp, clock.Seconds);
+            int armedEvents = recorder.Events.Count(e => e.Type == ProcessEventType.Armed);
+            coordinator.Submit(TrainingCommandType.Arm, clock.Seconds);
+            coordinator.Tick();
+            Assert.That(coordinator.Current.Permission, Is.False);
+            Assert.That(recorder.Events.Count(e => e.Type == ProcessEventType.Armed), Is.EqualTo(armedEvents));
+            Assert.That(coordinator.Current.Reasons.HasFlag(missingContact ? BlockReason.ContactInvalid : BlockReason.ClampDisconnected), Is.True);
+        }
+
+        [Test]
+        public void LegacyBooleanSafetyCannotManufactureContactOrReflection()
+        {
+            Ready(); Prepare();
+            safety.Value = new SafetyInput(true, true, false, BlockReason.None);
+            coordinator.Submit(TrainingCommandType.Arm, clock.Seconds);
+            coordinator.Tick();
+            Assert.That(coordinator.Current.Permission, Is.False);
+            Assert.That(coordinator.Current.Reasons.HasFlag(BlockReason.ContactInvalid), Is.True);
+            Assert.That(coordinator.Current.Reasons.HasFlag(BlockReason.ReflectionUnknown), Is.True);
+        }
+
+        [Test]
+        public void NonFiniteClockCannotRestoreOldArmAfterRecovery()
+        {
+            Ready(); PrepareAndArm(); input.Value = Valid(true); coordinator.Tick();
+            clock.Seconds = double.NaN; coordinator.Tick();
+            Assert.That(coordinator.Current.Permission, Is.False);
+            Assert.That(coordinator.Current.Session, Is.EqualTo(SessionState.Suspended));
+            clock.Seconds = 1; input.Value = Valid(false, true); coordinator.Tick();
+            input.Value = Valid(true); coordinator.Tick();
+            Assert.That(coordinator.Current.Permission, Is.False);
         }
 
         private void Ready()
@@ -848,7 +949,8 @@ namespace WeldingTrainer.Application.Tests
         private sealed class Safety : ISafetyPort
         {
             public SafetyInput Value =
-                new SafetyInput(true, true, false, BlockReason.None);
+                new SafetyInput(true, false, true, true, false,
+                    new ContactEvidence(ContactState.Contact, ContactReason.None, "synthetic", default, new Vec3(0, 0, 1), 0, 0, true, true), RiskState.Low, BlockReason.None);
 
             public SafetyInput Evaluate(
                 TrainingInput trainingInput,
