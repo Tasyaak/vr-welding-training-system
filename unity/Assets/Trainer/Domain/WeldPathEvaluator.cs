@@ -176,6 +176,87 @@ namespace WeldingTrainer.Domain
                 best.TangentWorkpiece);
         }
 
+        public Vec3 PositionAtArc(double arcLengthMetres)
+        {
+            if (!double.IsFinite(arcLengthMetres))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(arcLengthMetres),
+                    "Arc length must be finite.");
+            }
+
+            double arc = Math.Max(
+                0d,
+                Math.Min(LengthMetres, arcLengthMetres));
+
+            int segmentIndex = 0;
+
+            while (segmentIndex < _arcLength.Length - 2 &&
+                _arcLength[segmentIndex + 1] < arc)
+            {
+                segmentIndex++;
+            }
+
+            double segmentStartArc = _arcLength[segmentIndex];
+            double segmentEndArc = _arcLength[segmentIndex + 1];
+            double segmentLength = segmentEndArc - segmentStartArc;
+
+            double t = segmentLength <= 0d
+                ? 0d
+                : (arc - segmentStartArc) / segmentLength;
+
+            return _points[segmentIndex] +
+                (_points[segmentIndex + 1] - _points[segmentIndex]) * t;
+        }
+
+        public IReadOnlyList<Vec3> Extract(
+            double startArcLengthMetres,
+            double endArcLengthMetres)
+        {
+            if (!double.IsFinite(startArcLengthMetres))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(startArcLengthMetres),
+                    "Start arc length must be finite.");
+            }
+
+            if (!double.IsFinite(endArcLengthMetres))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(endArcLengthMetres),
+                    "End arc length must be finite.");
+            }
+
+            double start = Math.Max(
+                0d,
+                Math.Min(
+                    LengthMetres,
+                    Math.Min(startArcLengthMetres, endArcLengthMetres)));
+
+            double end = Math.Max(
+                0d,
+                Math.Min(
+                    LengthMetres,
+                    Math.Max(startArcLengthMetres, endArcLengthMetres)));
+
+            var result = new List<Vec3>
+            {
+                PositionAtArc(start)
+            };
+
+            for (int i = 1; i < _points.Length - 1; i++)
+            {
+                if (_arcLength[i] > start &&
+                    _arcLength[i] < end)
+                {
+                    result.Add(_points[i]);
+                }
+            }
+
+            result.Add(PositionAtArc(end));
+
+            return result;
+        }
         private static double Clamp01(double value) =>
             Math.Max(0d, Math.Min(1d, value));
     }
