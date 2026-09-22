@@ -406,4 +406,43 @@ namespace WeldingTrainer.Application.Tests
         public void NozzleCompatibilityTableIsExplicit(ProcessMode mode,string nozzle,bool expected)
             =>Assert.That(NozzleCompatibility.IsCompatible(mode,nozzle),Is.EqualTo(expected));
     }
+
+    public sealed class BackReflectionTests
+    {
+        [Test]
+        public void NormalIncidenceReflectsAlongNormalAndHitsHead()
+        {
+            ReflectionRiskResult result=SimulatedBackReflectionEvaluator.Evaluate("plate",default,
+                new Vector3d(0,-1,0),new Vector3d(0,1,0),new ReflectionTarget("head",new Vector3d(0,1,0),.1),.1,.05);
+            Assert.That(result.Reflected.Y,Is.EqualTo(1).Within(1e-9));
+            Assert.That(result.Level,Is.EqualTo(ReflectionRiskLevel.High));
+            Assert.That(result.IdealRayIntersection,Is.True);
+        }
+
+        [Test]
+        public void ConeCatchesSphereWhoseCenterIsOutsideCone()
+        {
+            double angle=.2;Vector3d center=new(Math.Sin(angle),Math.Cos(angle),0);
+            ReflectionRiskResult result=SimulatedBackReflectionEvaluator.Evaluate("plate",default,
+                new Vector3d(0,-1,0),new Vector3d(0,1,0),new ReflectionTarget("head",center,.15),.1,.05);
+            Assert.That(result.Level,Is.EqualTo(ReflectionRiskLevel.High));
+            Assert.That(result.IdealRayIntersection,Is.False);
+        }
+
+        [Test]
+        public void TargetBehindApexIsLowModeledRisk()
+        {
+            ReflectionRiskResult result=SimulatedBackReflectionEvaluator.Evaluate("plate",default,
+                new Vector3d(0,-1,0),new Vector3d(0,1,0),new ReflectionTarget("head",new Vector3d(0,-1,0),.1),.1,.05);
+            Assert.That(result.Level,Is.EqualTo(ReflectionRiskLevel.Low));
+        }
+
+        [Test]
+        public void InvalidNormalIsUnknown()
+        {
+            ReflectionRiskResult result=SimulatedBackReflectionEvaluator.Evaluate("plate",default,
+                new Vector3d(0,-1,0),default,new ReflectionTarget("head",new Vector3d(0,1,0),.1),.1,.05);
+            Assert.That(result.Level,Is.EqualTo(ReflectionRiskLevel.Unknown));
+        }
+    }
 }

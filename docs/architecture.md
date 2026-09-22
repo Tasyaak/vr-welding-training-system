@@ -82,6 +82,10 @@ activation reducer is the only authority for simulated output and publishes ever
 plus a prioritized reason. Missing reflection or process-prerequisite providers fail closed. See
 [unified-activation-interlock.md](unified-activation-interlock.md).
 
+Prospective back-reflection uses the tracked head volume and finite contact evidence before arming
+and during every process phase. Its geometric model and latch timeline are documented in
+[simulated-back-reflection.md](simulated-back-reflection.md).
+
 ## Units and determinism
 
 - metres, seconds and metres/second in Domain;
