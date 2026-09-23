@@ -25,6 +25,7 @@ namespace WeldingTrainer.Application
     }
     public interface ITrainingInputPort { TrainingInput Capture(double now); } public interface IRegistrationPort { RegistrationInput Capture(double now); void Teardown(); } public interface ISafetyPort { SafetyInput Evaluate(TrainingInput input,RegistrationInput registration,AttemptConfiguration attempt); }
     public interface IRecorderPort { bool Available{get;} void Append(ProcessEvent e); void Begin(AttemptConfiguration attempt); bool Finish(string attemptId,bool interrupted,out string error); void Teardown(); }
+    public interface IAttemptDataRecorder { bool TryAppend(AttemptSample sample); long DroppedSamples{get;} }
     public interface ISnapshotSink { void Publish(ProcessSnapshot snapshot); } public interface IHapticStop { void StopImmediately(); }
     public interface IProcessStopSink { void StopAll(long activationEpoch,BlockReason reason); }
 }
