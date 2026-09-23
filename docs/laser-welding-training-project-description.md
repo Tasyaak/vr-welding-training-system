@@ -11,8 +11,9 @@ Audited main ee8999e contains the presentation prototype and XR scene, not the
 production feature set described here. #46 adds the independent spatial-content
 subset described in [the authoring guide](spatial-content-authoring.md): actual
 CAD surfaces, nominal identity mounting, versioned QR recess and immutable
-catalogs. Unqualified physical values and missing seam/cleaning selection block
-scored use. Existing unmerged PRs are not inputs or
+catalogs, the owner-selected directed T-joint and pre/post cleaning bands. Two
+QR print candidates have known dimensions; selection and physical installation
+qualification still block scored use. Existing unmerged PRs are not inputs or
 dependencies of this revised implementation plan.
 
 ## Registration and mechanical setup

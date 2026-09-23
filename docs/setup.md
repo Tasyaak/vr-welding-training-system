@@ -38,7 +38,9 @@ evaluation, routes A/menu navigation without trigger click-through, preserves
 global B/E-stop and connects one semantic feedback/recording pipeline.
 
 For the supplied fixture, #46 authors the CAD recess and nominal identity part
-transform. #66 qualifies actual QR dimensions, thickness-adjusted plane and
+transform and the selected T-joint/cleaning bands. Both QR print specifications
+are known (90 mm labels, 0.1 mm thick, 53/63 mm symbols excluding quiet zone).
+#66 compares/selects one and qualifies its installed plane, placement and
 manufactured assembly deviations. Do not infer measurements from filenames.
 Use [spatial authoring](spatial-content-authoring.md) for local conversion,
 independent preview, validation and tests. Confirm the actual part

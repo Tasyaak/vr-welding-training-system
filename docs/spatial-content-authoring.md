@@ -14,7 +14,7 @@ snapshots into training; #66 supplies physical installation evidence.
 | `engineering/cad/selections.json` | Explicit semantic selection tied to source identity |
 | `tools/cad/requirements.txt` | Pinned authoring-only OpenCascade dependencies |
 | `tools/cad/inspect_step.py` | B-rep validity, units, solid and face inspection |
-| `tools/cad/bake.py` | Tessellation, seam arc-length bake, metre export and provenance |
+| `tools/cad/bake.py`, `author_joint.py` | Tessellation, exact selected edge, clipped bands, metre export and provenance |
 | `unity/Assets/Trainer/Content/Spatial/Generated` | Visual JSON, finite geometry JSON and `.spatial` catalog |
 | `Content/Spatial/Runtime` | Engine-neutral records, validation, rigid math, immutable snapshots |
 | `Content/Spatial/Unity` | Imported ScriptableObject and Unity serialization adapter |
@@ -63,7 +63,7 @@ speculative simplified collision proxies. No CAD edge automatically becomes a se
 
 The catalog records source SHA-256/revisions, converter/version, axes/pivot,
 import poses, unit/deflection settings and visual/geometry hashes. `bakeInputs`
-also hashes scripts, requirements, authoring and selection files. Snapshot
+also hashes scripts, requirements, authoring, selections and the owner-evidence record. Snapshot
 SHA-256 covers exact UTF-8 catalog bytes including those transitive identities;
 geometry hashes cover exact geometry bytes. There is no self-referential hash.
 Changes require a rebake and intentional revision review. Editor/build validation
@@ -78,7 +78,7 @@ Full OpenCascade rebaking is an explicit authoring check, not a claimed CI run.
 
 The shared CAD origin remains the Fixture and Workpiece origin. Numeric `(x,y,z)`
 components remain unchanged. Identity import rotation/pivot and one multiplication
-by `0.001` during vertex export convert mm to m. No GameObject scale is involved.
+by `0.001` at STEP geometry export convert mm to m (mesh vertices and selected B-rep edge endpoints each once). No GameObject scale is involved.
 Wire rigid scale must equal 1; runtime poses have no scale degree of freedom.
 Quaternion order is `(x,y,z,w)`.
 
@@ -99,35 +99,76 @@ fixture face 14, X [-0.15,-0.06], Z [0.06,0.15]. Surrounding top Y is 0.008 m.
 The in-plane orientation is an authored nominal choice, not evidence of an
 installed printed label.
 
-Initial `FixtureFromMarker` is that floor pose, explicitly unqualified. #66 must
-incorporate measured label/plate thickness and installation offset/orientation
-in a new revision. Recess size is not QR print size. Unknown wire measurements
-use explicit known flags and zero sentinels; immutable marker/tool snapshots
-expose unknown values as null, never usable identity offsets or zero dimensions.
+Initial `FixtureFromMarker` remains that floor pose, explicitly unqualified.
+Known print thickness does not establish the installed marker plane. #66 must
+select a print and record installed pose/evidence in a new content revision.
 
-## Actual content and unavailable semantic input
+### Alternative print specifications
 
-Both supplied bodies are fully tessellated in their nominal assembly, with
-versioned source face/triangle IDs, finite surfaces and outward normals. The CAD
-recess, one active PART-001 binding, versions, confirmation and invalidation
-instructions are authored.
+`MARKER-001` revision 2 owns two immutable `PrintCandidateSnapshot` records
+(print schema 1 / revision 1), not two physical markers or assembly bindings:
 
-**The fused T-shaped STEP solid and current repository do not establish selected
-weld joints, pass direction, or pre/post-cleaning masks.** `selections.json`
-therefore contains empty selections and `MissingAuthoritativeSelection` with a
-specific explanation. No guessed fillet path or whole-part mask is approved.
-This is missing semantic source input, separate from #66 physical metrology.
-Obtain an approved drawing or explicit content-author selection before scoring.
+| Candidate | White label | Thickness | Centered symbol, excluding quiet zone | Payload |
+| --- | --- | --- | --- | --- |
+| QR-PRINT-A | 90 × 90 mm | 0.1 mm | 53 × 53 mm | LW1:PART-001 |
+| QR-PRINT-B | 90 × 90 mm | 0.1 mm | 63 × 63 mm | LW1:PART-001 |
 
-To author an approved seam, supply points in Workpiece metres, one `surfaceId`
-per segment and `authoringEvidence`. Split at triangle boundaries; bake computes
-cumulative arc lengths from zero. The true supporting outward normal remains
-separate from any joint bisector. Multiple directed seams are supported.
-Cleaning masks contain oriented triangles, one support ID per triangle,
-`PreWeld`/`PostWeld` phase and evidence. All vertices must lie in the convex finite
-support, which also ensures edge/interior containment. Re-author selections after
-source topology changes. `Approved` requires seams and both mask phases.
-Synthetic cases test these capabilities independently of the unapproved specimen.
+`SelectedPrintCandidateId` is null in snapshots (empty on wire). Legacy marker
+dimension fields describe the selected marker only and remain unavailable;
+they do not erase the known specifications exposed by `PrintCandidates`.
+Candidate payload must match its bound part. IDs, revisions, positive finite
+dimensions, centered symbol/margin, convention and mounting footprint validate.
+Selection must copy the candidate metadata consistently; selection alone never
+qualifies the plane or station. Installed containment checks the whole white
+label, not only the smaller symbol. Only one print can occupy the one mount.
+
+No digital QR artwork was supplied. `artworkProvenance=NotSupplied` explicitly
+withholds file hashes, module count, version and error correction. The blank
+margin cannot establish quiet-zone module compliance without that artwork.
+The specification evidence is the owner's recorded instruction, not a print
+file or physical accuracy report. #66 compares/selects and physically qualifies.
+
+## Actual approved semantic content
+
+`PART-001` / its geometry, marker, binding and catalog are revision 2; fixture,
+mount region, mounting revision and original STEP identities are unchanged.
+`FixtureFromWorkpiece` remains identity. The owner selection recorded in
+`engineering/cad/semantic-selection.md` resolves the earlier semantic gap.
+
+The directed seam is the single shared straight B-rep edge of workpiece face 4
+(horizontal, Y=15.5 mm, outward +Y) and face 13 (upright, Z=-44 mm, outward +Z).
+The exact exported endpoints in Workpiece metres are:
+
+```text
+start = (-0.09446746641944131, 0.0155, -0.044000000000000025)
+end   = ( 0.09027822178886748, 0.0155, -0.04400000000000001)
+length = 0.18474568820830878 m
+```
+
+Increasing X is left→right from the QR-visible side. The bake selects those
+faces explicitly, requires a unique shared straight edge and checks its Y/Z
+planes and both outward normals. Endpoints retain B-rep double precision;
+triangulated surfaces retain their documented 10-decimal metre rounding.
+Segment support IDs identify both finite triangles through `surfaceIds` and
+`adjacentSurfaceIds`. Reversing points changes travel direction; it is not an
+equivalent serialization. Production tests assert ordered endpoints.
+The trailing Z digits are B-rep floating-point representation of the nominal
+Z=-44 mm plane, not a measured nonplanarity or a physical precision claim.
+
+Both PreWeld and PostWeld span the full seam X interval. The horizontal strip
+is Y=0.0155, Z=[-0.044,-0.029] m; the upright strip is Z=-0.044,
+Y=[0.0155,0.0305] m. Sutherland–Hodgman clipping intersects each finite source
+triangle with the strip halfspaces, then fan triangulation preserves winding
+and support IDs. Area checks require length × 0.015 m on each face. Separate
+region IDs/phases share geometry without merging their process meaning.
+No hole-side faces or whole-face masks are included. The resulting workpiece
+semantic status is `Approved`; the fixture itself has no training targets.
+
+Generic content still supports multiple directed seams, cumulative arc lengths,
+finite triangle masks, authoring evidence and an optional second joint support
+per segment. Validation rejects missing/nonadjacent support, invalid normals,
+out-of-surface segments/masks and missing approved pre/post phases. Source
+topology changes require deliberate re-authoring, not automatic weld inference.
 
 ## Authoring, preview and fail-closed use
 
@@ -139,22 +180,35 @@ Invalid content fails import/build with field/ID diagnostics, without normalizat
 Use **Trainer → Spatial → Validate all source and baked content** and
 **Trainer → Spatial → Inspect supplied CAD assembly**. The independent preview
 uses no scene, coordinator or QR observation. Drag to orbit: grey fixture, gold
-workpiece, cyan nominal recess perimeter. The perimeter gets a display-only
-0.05 mm lift against z-fighting. No unknown printed QR rectangle is drawn.
+workpiece, cyan nominal recess perimeter, green cleaning band and yellow seam. The perimeter gets a display-only
+0.05 mm lift against z-fighting. No invented QR artwork is drawn. Both phase masks coincide; the preview displays PreWeld once.
 Compare holes, floor/top height, common origin and axes against the source report.
 
 ![Nominal CAD assembly](images/spatial-assembly.png)
 
-This Unity render shows the supplied nominal CAD only, including the three
-through holes and the cyan recess perimeter. It is not a photographed or
+This Unity render uses the canonical top view: mounting holes north, recess
+lower-left, and the +Z seam below the upright. **Exact top** resets to +Y view
+with -Z north; both buttons and exported image use the same RH CAD camera.
+The previous initial view was on the mounting-hole side; Unity default LookAt
+also places -X on screen-right in the canonical overhead view, mirroring
+the physical CAD interpretation. `CadPreviewView` constructs screen-right as
+forward cross up and scopes the corresponding rasterizer-culling parity.
+No source, authored coordinates, import, mesh winding or rigid pose was changed.
+Projection tests check recess lower-left, holes north, directed seam left→right
+and positive view determinant. Ordinary Unity numeric cross/quaternion tests
+remain useful but do not prove physical screen chirality. #49 must normalize
+physical SDK basis/corner ordering explicitly; never represent reflection by
+a rigid quaternion or copy this editor camera into runtime registration.
+
+This render shows nominal CAD and authored semantics. It is not a photographed or
 physically qualified installation. Reproduce it with **Trainer → Spatial →
 Export nominal CAD preview PNG** (output under ignored `artifacts/`).
 
 `SpatialCatalogAsset.Freeze()` returns a catalog with read-only, defensively
 copied collections and vector/quaternion value copies. `ResolveForPreview`
 allows inspection of valid unqualified content; `ResolveForScoredRegistration`
-rejects unknown/malformed IDs, missing station approval, unknown marker dimensions
-or plane, and missing workpiece semantics. Duplicate active part bindings reject
+rejects unknown/malformed IDs, missing station approval, an unselected print candidate, unknown installed
+marker dimensions/plane, or missing workpiece semantics. Duplicate active part bindings reject
 the entire catalog. This MVP has one mount per `partId`; no mount key, arbitrary
 pose or downloaded configuration is in QR. #49 owns `LW1:partId` parsing/tracking.
 

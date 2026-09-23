@@ -34,6 +34,7 @@ namespace WeldingTrainer.Content.Spatial
         public IReadOnlyList<Vec3> Points { get; }
         public IReadOnlyList<double> ArcLengthsMetres { get; }
         public IReadOnlyList<string> SurfaceIds { get; }
+        public IReadOnlyList<string> AdjacentSurfaceIds { get; }
 
         internal SeamSnapshot(SeamData s)
         {
@@ -42,6 +43,7 @@ namespace WeldingTrainer.Content.Spatial
             Points = Array.AsReadOnly((Vec3[])s.points.Clone());
             ArcLengthsMetres = Array.AsReadOnly((double[])s.arcLengthsMetres.Clone());
             SurfaceIds = Array.AsReadOnly((string[])s.surfaceIds.Clone());
+            AdjacentSurfaceIds = Array.AsReadOnly((string[])(s.adjacentSurfaceIds ?? Array.Empty<string>()).Clone());
         }
     }
 
@@ -124,6 +126,40 @@ namespace WeldingTrainer.Content.Spatial
         }
     }
 
+    public sealed class PrintCandidateSnapshot
+    {
+        public int SchemaVersion { get; }
+        public string Id { get; }
+        public int Revision { get; }
+        public string Payload { get; }
+        public double LabelWidthMetres { get; }
+        public double LabelHeightMetres { get; }
+        public double LabelThicknessMetres { get; }
+        public double SymbolWidthMetres { get; }
+        public double SymbolHeightMetres { get; }
+        public bool SymbolCentered { get; }
+        public string SymbolQuietZoneConvention { get; }
+        public string ArtworkProvenance { get; }
+        public string SpecificationEvidence { get; }
+
+        internal PrintCandidateSnapshot(PrintCandidateData p)
+        {
+            SchemaVersion = p.schemaVersion;
+            Id = p.id;
+            Revision = p.revision;
+            Payload = p.payload;
+            LabelWidthMetres = p.labelWidthMetres;
+            LabelHeightMetres = p.labelHeightMetres;
+            LabelThicknessMetres = p.labelThicknessMetres;
+            SymbolWidthMetres = p.symbolWidthMetres;
+            SymbolHeightMetres = p.symbolHeightMetres;
+            SymbolCentered = p.symbolCentered;
+            SymbolQuietZoneConvention = p.symbolQuietZoneConvention;
+            ArtworkProvenance = p.artworkProvenance;
+            SpecificationEvidence = p.specificationEvidence;
+        }
+    }
+
     public sealed class MarkerSnapshot
     {
         public string Id { get; }
@@ -134,6 +170,8 @@ namespace WeldingTrainer.Content.Spatial
         public double? LabelThicknessMetres { get; }
         public string QuietZoneConvention { get; }
         public string InstallationEvidence { get; }
+        public IReadOnlyList<PrintCandidateSnapshot> PrintCandidates { get; }
+        public string SelectedPrintCandidateId { get; }
 
         internal MarkerSnapshot(MarkerData m)
         {
@@ -142,9 +180,11 @@ namespace WeldingTrainer.Content.Spatial
             PayloadPrefix = m.payloadPrefix;
             WidthMetres = m.dimensionsKnown ? (double? )m.widthMetres : null;
             HeightMetres = m.dimensionsKnown ? (double? )m.heightMetres : null;
-            LabelThicknessMetres = m.physicalPlaneKnown ? (double? )m.labelThicknessMetres : null;
+            LabelThicknessMetres = m.dimensionsKnown ? (double? )m.labelThicknessMetres : null;
             QuietZoneConvention = m.quietZoneConvention;
             InstallationEvidence = m.installationEvidence;
+            SelectedPrintCandidateId = string.IsNullOrEmpty(m.selectedPrintCandidateId) ? null : m.selectedPrintCandidateId;
+            PrintCandidates = Array.AsReadOnly((m.printCandidates ?? Array.Empty<PrintCandidateData>()).Select(p => new PrintCandidateSnapshot(p)).ToArray());
         }
     }
 
@@ -214,10 +254,12 @@ namespace WeldingTrainer.Content.Spatial
             var reasons = new List<string>();
             if (b.qualification != "Qualified")
                 reasons.Add("StationUnqualified: #66 installation/rebolting/error-budget evidence required");
-            if (!marker.dimensionsKnown)
+            if ((marker.printCandidates?.Length ?? 0) > 0 && string.IsNullOrEmpty(marker.selectedPrintCandidateId))
+                reasons.Add("PrintCandidateNotSelected: #66 must compare the known print specifications and select one");
+            else if (!marker.dimensionsKnown)
                 reasons.Add("MarkerDimensionsUnknown: printed size and quiet-zone convention required");
             if (!marker.physicalPlaneKnown)
-                reasons.Add("MarkerPlaneUnknown: measured label thickness/installation required");
+                reasons.Add("MarkerPlaneUnknown: installed plane/placement evidence required; print specification is not metrology");
             if (part.SemanticStatus != "Approved")
                 reasons.Add("GeometrySemanticsMissing: " + part.SemanticReason);
             ScoredRegistrationBlockers = reasons.AsReadOnly();

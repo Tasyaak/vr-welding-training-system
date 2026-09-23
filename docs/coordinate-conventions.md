@@ -57,7 +57,18 @@ exports have confirmed nominal identity `FixtureFromWorkpiece`; physical
 deviations still require #66. #46 preserves numeric CAD axes/origin and converts
 millimetres exactly once in the bake. The recess defines nominal Marker origin
 (-0.105,0.0076,0.105) m, axes (+Fixture X, -Fixture Z, +Fixture Y), and footprint
-0.09 × 0.09 m. Printed dimensions and thickness-adjusted plane remain unknown.
+0.09 × 0.09 m. Two candidate labels are 90 × 90 × 0.1 mm, with centered
+53/63 mm symbols excluding quiet zone. Neither is selected; installed plane and
+placement remain unqualified. Known thickness does not move the nominal floor pose.
+
+The CAD inspector uses an explicit right-handed view matrix: from +Y with -Z
+north, screen-right is +X and the recess is lower-left. Unity default LookAt
+uses the opposite screen-right for this view. The inspector corrects view and
+rasterizer parity together; source coordinates, mesh data and rigid poses stay
+unchanged. Numeric quaternion/cross-product agreement alone does not prove
+physical screen chirality. #49 must test the physical MRUK-to-authored basis,
+including marker corner order, outward normal and asymmetric recess placement;
+a reflection cannot be hidden inside a rigid quaternion.
 See [concrete import/normal conventions](spatial-content-authoring.md).
 
 A seam frame uses directed unit tangent t, authored outward surface normal n

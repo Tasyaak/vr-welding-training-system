@@ -35,8 +35,9 @@ uses a camera-relative straight seam and does not implement production QR
 registration, process state or persistence. Group A content now lives in
 `Content/Spatial`: supplied CAD, deterministic conversion, finite surfaces,
 QR recess, versioned assembly catalog and validation. The supplied content is
-unqualified for scoring: printed QR measurements and authoritative seam/cleaning
-selections are missing. Runtime registration and training integration remain
+unqualified for scoring: two known QR print candidates await selection and
+physical installation qualification under #66. The owner-selected directed
+T-joint and finite pre/post cleaning bands are now authored. Runtime registration and training integration remain
 separate issues. Existing unmerged PRs are not prerequisites.
 
 ## Parallel delivery

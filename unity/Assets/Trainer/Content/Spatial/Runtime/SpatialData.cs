@@ -102,12 +102,25 @@ namespace WeldingTrainer.Content.Spatial
     }
 
     [Serializable]
+    public sealed class PrintCandidateData
+    {
+        public int schemaVersion, revision;
+        public string id, payload, symbolQuietZoneConvention, artworkProvenance, specificationEvidence;
+        public double labelWidthMetres, labelHeightMetres, labelThicknessMetres;
+        public double symbolWidthMetres, symbolHeightMetres;
+        public bool symbolCentered;
+    }
+
+    [Serializable]
     public sealed class MarkerData
     {
         public string id, payloadPrefix, quietZoneConvention, installationEvidence;
         public int revision;
         public bool dimensionsKnown, physicalPlaneKnown;
         public double widthMetres, heightMetres, labelThicknessMetres;
+        // Alternatives for ONE mounting location, not additional active markers.
+        public PrintCandidateData[] printCandidates;
+        public string selectedPrintCandidateId;
     }
 
     [Serializable]
@@ -157,6 +170,8 @@ namespace WeldingTrainer.Content.Spatial
         public string id, authoringEvidence;
         // One supporting finite triangle per segment. Split at triangle boundaries.
         public string[] surfaceIds;
+        // Optional second finite support per segment for an explicitly authored joint.
+        public string[] adjacentSurfaceIds;
         public Vec3[] points;
         public double[] arcLengthsMetres;
     }

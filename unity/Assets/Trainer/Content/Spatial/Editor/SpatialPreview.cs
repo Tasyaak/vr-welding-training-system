@@ -12,7 +12,8 @@ namespace WeldingTrainer.Content.Spatial.Editor
         private SpatialCatalogSnapshot snapshot;
         private PreviewRenderUtility preview;
         private Material material;
-        private Vector2 orbit = new Vector2(-35, 0);
+        private Vector2 orbit = Vector2.zero;
+        private bool topView = true;
         private string diagnostic;
         [MenuItem("Trainer/Spatial/Inspect supplied CAD assembly")]
         public static void Open()
@@ -65,12 +66,27 @@ namespace WeldingTrainer.Content.Spatial.Editor
                 Reload();
             EditorGUILayout.HelpBox(diagnostic ?? "Open a catalog", MessageType.Info);
             EditorGUILayout.LabelField("CAD metres • drag to orbit • cyan = QR recess floor, not printed QR");
+            if (GUILayout.Button("Reset: QR side, holes north"))
+            {
+                orbit = Vector2.zero;
+                topView = false;
+                Repaint();
+            }
+
+            if (GUILayout.Button("Exact top: +Y view, -Z north"))
+            {
+                orbit = Vector2.zero;
+                topView = true;
+                Repaint();
+            }
+
             var rect = GUILayoutUtility.GetRect(200, 200, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
             if (snapshot == null)
                 return;
             if (Event.current.type == EventType.MouseDrag && rect.Contains(Event.current.mousePosition))
             {
                 orbit += Event.current.delta;
+                topView = false;
                 Event.current.Use();
                 Repaint();
             }
@@ -79,7 +95,7 @@ namespace WeldingTrainer.Content.Spatial.Editor
                 return;
             preview.BeginPreview(rect, GUIStyle.none);
             DrawAssembly();
-            preview.camera.Render();
+            CadPreviewView.Render(preview.camera);
             GUI.DrawTexture(rect, preview.EndPreview(), ScaleMode.StretchToFill, false);
             ClearTemporaryMeshes();
         }
@@ -88,8 +104,8 @@ namespace WeldingTrainer.Content.Spatial.Editor
         {
             var camera = preview.camera;
             camera.fieldOfView = 45;
-            camera.transform.position = Quaternion.Euler(orbit.y, orbit.x, 0) * new Vector3(0, .3f, -.55f);
-            camera.transform.LookAt(new Vector3(0, .02f, 0));
+            var eye = topView ? new Vector3(0, .6f, 0) : Quaternion.Euler(orbit.y, orbit.x, 0) * new Vector3(0, .6f, .13f);
+            CadPreviewView.Configure(camera, eye, new Vector3(0, .02f, 0), topView ? Vector3.back : Vector3.up);
             camera.clearFlags = CameraClearFlags.Color;
             camera.backgroundColor = new Color(.08f, .09f, .12f);
             var binding = snapshot.Bindings.First();
@@ -130,8 +146,36 @@ namespace WeldingTrainer.Content.Spatial.Editor
             overlay.SetIndices(new[] { 0, 1, 1, 2, 2, 3, 3, 0 }, MeshTopology.Lines, 0);
             preview.DrawMesh(overlay, Matrix4x4.identity, material, 0);
             temporary.Add(overlay);
+            // Semantic overlays are display-only offsets; authored triangles remain on CAD.
+            var posePart = binding.FixtureFromWorkpiece;
+            foreach (var region in binding.WorkpieceGeometry.CleaningRegions.Where(x => x.Phase == "PreWeld"))
+            {
+                var vertices = region.Triangles.SelectMany(t => new[] { t.A + t.Normal * .00008, t.B + t.Normal * .00008, t.C + t.Normal * .00008 }).Select(posePart.TransformPoint).Select(ToUnity).ToArray();
+                var mask = new Mesh
+                {
+                    vertices = vertices,
+                    colors = Enumerable.Repeat(new Color(.2f, .65f, .35f, 1), vertices.Length).ToArray()
+                };
+                mask.SetIndices(Enumerable.Range(0, vertices.Length).ToArray(), MeshTopology.Triangles, 0);
+                preview.DrawMesh(mask, Matrix4x4.identity, material, 0);
+                temporary.Add(mask);
+            }
+
+            foreach (var seam in binding.WorkpieceGeometry.Seams)
+            {
+                var vertices = seam.Points.Select(p => posePart.TransformPoint(p + new Vec3(0, .0002, .0002))).Select(ToUnity).ToArray();
+                var line = new Mesh
+                {
+                    vertices = vertices,
+                    colors = Enumerable.Repeat(Color.yellow, vertices.Length).ToArray()
+                };
+                line.SetIndices(Enumerable.Range(0, vertices.Length - 1).SelectMany(i => new[] { i, i + 1 }).ToArray(), MeshTopology.Lines, 0);
+                preview.DrawMesh(line, Matrix4x4.identity, material, 0);
+                temporary.Add(line);
+            }
         }
 
+        private static Vector3 ToUnity(Vec3 p) => new Vector3((float)p.x, (float)p.y, (float)p.z);
         private void ClearTemporaryMeshes()
         {
             foreach (var mesh in temporary)
@@ -153,7 +197,7 @@ namespace WeldingTrainer.Content.Spatial.Editor
                     throw new SpatialContentException(window.diagnostic);
                 window.preview.BeginStaticPreview(new Rect(0, 0, 1400, 1000));
                 window.DrawAssembly();
-                window.preview.camera.Render();
+                CadPreviewView.Render(window.preview.camera);
                 texture = window.preview.EndStaticPreview();
                 var root = System.IO.Path.GetFullPath(System.IO.Path.Combine(Application.dataPath, "../.."));
                 var path = System.IO.Path.Combine(root, "artifacts/spatial-assembly.png");

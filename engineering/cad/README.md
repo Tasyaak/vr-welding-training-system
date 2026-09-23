@@ -7,8 +7,10 @@ Original engineering inputs stay outside Unity Assets.
 
 Edit nominal definitions in `authoring.json` and semantic selections in
 `selections.json`; follow [the workflow](../../docs/spatial-content-authoring.md).
-No authoritative seam/cleaning selection was supplied. Unknown marker/tool
-measurements remain explicitly unknown.
+The owner-selected T-joint, directed travel and 15 mm L-shaped cleaning bands
+are recorded in `semantic-selection.md` and baked from finite CAD supports.
+Two known alternative QR print specifications are recorded without selection.
+Installed marker plane, station accuracy and tool measurements remain unqualified.
 
 | Source | SHA-256 |
 | --- | --- |

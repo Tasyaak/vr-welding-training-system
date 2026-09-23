@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "supplied-assembly-catalog",
-  "revision": 1,
+  "revision": 2,
   "units": "m",
   "fixtures": [
     {
@@ -43,7 +43,7 @@
   "workpieces": [
     {
       "id": "PART-001",
-      "revision": 1,
+      "revision": 2,
       "sourceId": "welded_part",
       "geometryId": "welded_part-geometry"
     }
@@ -51,7 +51,7 @@
   "markers": [
     {
       "id": "MARKER-001",
-      "revision": 1,
+      "revision": 2,
       "payloadPrefix": "LW1:",
       "dimensionsKnown": false,
       "widthMetres": 0,
@@ -59,21 +59,54 @@
       "quietZoneConvention": "Unqualified",
       "physicalPlaneKnown": false,
       "labelThicknessMetres": 0,
-      "installationEvidence": ""
+      "installationEvidence": "",
+      "selectedPrintCandidateId": "",
+      "printCandidates": [
+        {
+          "schemaVersion": 1,
+          "revision": 1,
+          "id": "QR-PRINT-A",
+          "payload": "LW1:PART-001",
+          "symbolQuietZoneConvention": "ExcludesQuietZone",
+          "artworkProvenance": "NotSupplied",
+          "specificationEvidence": "engineering/cad/semantic-selection.md (project owner, 2026-09-23)",
+          "labelWidthMetres": 0.09,
+          "labelHeightMetres": 0.09,
+          "labelThicknessMetres": 0.0001,
+          "symbolWidthMetres": 0.053,
+          "symbolHeightMetres": 0.053,
+          "symbolCentered": true
+        },
+        {
+          "schemaVersion": 1,
+          "revision": 1,
+          "id": "QR-PRINT-B",
+          "payload": "LW1:PART-001",
+          "symbolQuietZoneConvention": "ExcludesQuietZone",
+          "artworkProvenance": "NotSupplied",
+          "specificationEvidence": "engineering/cad/semantic-selection.md (project owner, 2026-09-23)",
+          "labelWidthMetres": 0.09,
+          "labelHeightMetres": 0.09,
+          "labelThicknessMetres": 0.0001,
+          "symbolWidthMetres": 0.063,
+          "symbolHeightMetres": 0.063,
+          "symbolCentered": true
+        }
+      ]
     }
   ],
   "bindings": [
     {
       "id": "ASSEMBLY-001",
-      "revision": 1,
+      "revision": 2,
       "active": true,
       "partId": "PART-001",
-      "partRevision": 1,
+      "partRevision": 2,
       "fixtureId": "FIXTURE-001",
       "fixtureRevision": 1,
       "mountRevision": 1,
       "markerId": "MARKER-001",
-      "markerRevision": 1,
+      "markerRevision": 2,
       "mountRegionId": "QR-RECESS-001",
       "mountRegionRevision": 1,
       "fixtureFromWorkpiece": {
@@ -110,7 +143,7 @@
       },
       "qualification": "Unqualified",
       "qualificationEvidence": "",
-      "operatorConfirmation": "Confirm PART-001 revision 1 on FIXTURE-001 revision 1, mount revision 1, correct QR label and secure fastening. Bolts do not connect the virtual electrical clamp.",
+      "operatorConfirmation": "Confirm PART-001 revision 2 on FIXTURE-001 revision 1, mount revision 1, correct QR label and secure fastening. Bolts do not connect the virtual electrical clamp.",
       "invalidationInstructions": "Invalidate registration after rebolting, part/fixture movement, part change or marker relocation; register again before a new attempt."
     }
   ],
@@ -158,7 +191,11 @@
   "bakeInputs": [
     {
       "path": "tools/cad/bake.py",
-      "sha256": "e8d5d159d09116bfd55b751f734d1a60962c520dd51cb2d373a8b6e305a649d9"
+      "sha256": "d888e4d64e5b653c8a732e702d88be8617032f45b748abfe345bba725a2f66c1"
+    },
+    {
+      "path": "tools/cad/author_joint.py",
+      "sha256": "bf73031d678fc17adfa6104dd839ad09135ed4c2f3c9b655bf052252e676e2fb"
     },
     {
       "path": "tools/cad/inspect_step.py",
@@ -169,12 +206,16 @@
       "sha256": "562b2f70361a1f82a8c9a3a1c82bb6c6daca93a70bb6642ed60f5e46687f9980"
     },
     {
+      "path": "engineering/cad/semantic-selection.md",
+      "sha256": "10dc9ce59da13651ba4fcfa4e26de43d60692d2310d007d74c934c172ff95a33"
+    },
+    {
       "path": "engineering/cad/authoring.json",
-      "sha256": "90ac2b919e735ec1d81669e05f45b8b26582dbaf17cb6733af21d2470489ae3a"
+      "sha256": "e603a40c7d0d8e829f51fff5c2531d1ffc68bc35643a521ce86425f9d284cb01"
     },
     {
       "path": "engineering/cad/selections.json",
-      "sha256": "1ad438b4594121b15ce166492f7a253e9d6c28f34aaf7b2c36453c6c72bd127e"
+      "sha256": "9f06ec4591ad8211bf63c747bdd3e905b95574a5afda65c493dcaa1f64013f31"
     }
   ],
   "sources": [
@@ -250,7 +291,7 @@
       "chordToleranceMetres": 5e-05,
       "angularToleranceRadians": 0.1,
       "geometryFile": "welded_part.geometry.json",
-      "geometrySha256": "428f14b0d1c00200652e6bd8c0c445e8e5004ab70b96dff203810a0fbf6c46f4",
+      "geometrySha256": "039fb68701cf1f3e5c26c032aacbf5931558aa18f805d0e21e5074b75092c8af",
       "visualFile": "welded_part.visual.json",
       "visualSha256": "c51e15b99cec817ae09a25a32ecbcf6723e15f16de104e13366979b8e746cfba"
     }

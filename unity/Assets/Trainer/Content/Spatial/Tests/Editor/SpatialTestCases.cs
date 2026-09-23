@@ -167,6 +167,114 @@ namespace WeldingTrainer.Content.Spatial.Tests
 
         public Dictionary<string, Action> Cases() => new Dictionary<string, Action>
         {
+            ["production print alternatives retain known specifications and no selection"] = () =>
+            {
+                var b = Load().ResolveForPreview("PART-001");
+                var m = b.Marker;
+                Check(m.PrintCandidates.Count == 2 && m.SelectedPrintCandidateId == null, "two unselected alternatives");
+                Check(b.Qualification == "Unqualified" && !b.ReadyForScoredRegistration, "false qualification");
+                foreach (var p in m.PrintCandidates)
+                {
+                    Check(p.Payload == "LW1:PART-001" && p.SchemaVersion == 1 && p.Revision == 1, "candidate identity");
+                    Check(p.LabelWidthMetres == .09 && p.LabelHeightMetres == .09 && p.LabelThicknessMetres == .0001, "physical label dimensions");
+                    Check(p.SymbolCentered && p.SymbolQuietZoneConvention == "ExcludesQuietZone" && p.ArtworkProvenance == "NotSupplied", "artwork/convention");
+                    double size = p.Id == "QR-PRINT-A" ? .053 : p.Id == "QR-PRINT-B" ? .063 : 0;
+                    Check(size > 0 && p.SymbolWidthMetres == size && p.SymbolHeightMetres == size, "symbol dimensions");
+                }
+
+                var mutable = Catalog();
+                var frozen = Load(write(mutable));
+                mutable.markers[0].printCandidates[0].labelWidthMetres = 99;
+                Check(frozen.ResolveForPreview("PART-001").Marker.PrintCandidates[0].LabelWidthMetres == .09, "candidate snapshot mutable");
+                Check(((IList<PrintCandidateSnapshot>)m.PrintCandidates).IsReadOnly, "mutable collection");
+            },
+            ["invalid print alternatives and false selection rejected"] = () =>
+            {
+                BadCatalog(c => c.markers[0].printCandidates[1].id = "QR-PRINT-A", "duplicate ID");
+                BadCatalog(c => c.markers[0].printCandidates[0].payload = "LW1:PART-999", "bound part");
+                BadCatalog(c => c.markers[0].printCandidates[0].symbolWidthMetres = .09, "margin");
+                BadCatalog(c => c.markers[0].printCandidates[0].labelThicknessMetres = double.NaN, "positive");
+                BadCatalog(c => c.markers[0].printCandidates[0].symbolCentered = false, "centered");
+                BadCatalog(c => c.markers[0].printCandidates[0].symbolQuietZoneConvention = "IncludesQuietZone", "exclude");
+                BadCatalog(c => c.markers[0].printCandidates[0].artworkProvenance = "Invented", "provenance");
+                BadCatalog(c => c.markers[0].printCandidates[0].labelWidthMetres = .1, "beyond");
+                BadCatalog(c => c.markers[0].selectedPrintCandidateId = "UNKNOWN", "not found");
+                BadCatalog(c => c.markers[0].selectedPrintCandidateId = "QR-PRINT-A", "metadata must match");
+            },
+            ["selection alone does not qualify plane and installed white label must fit"] = () =>
+            {
+                var c = Catalog();
+                var m = c.markers[0];
+                m.selectedPrintCandidateId = "QR-PRINT-A";
+                m.dimensionsKnown = true;
+                m.widthMetres = m.heightMetres = .053;
+                m.labelThicknessMetres = .0001;
+                m.quietZoneConvention = "ExcludesQuietZone";
+                var b = Load(write(c)).ResolveForPreview("PART-001");
+                Check(!b.ReadyForScoredRegistration && b.ScoredRegistrationBlockers.Count == 2, "selection implied qualification");
+                Near(b.FixtureFromMarker.Position, new Vec3(-.105, .0076, .105));
+                m.physicalPlaneKnown = true;
+                m.installationEvidence = "TEST ONLY";
+                c.bindings[0].fixtureFromMarker.position.y += .0001;
+                c.bindings[0].fixtureFromMarker.position.x += .001;
+                Reject(() => SpatialValidation.Catalog(c), "beyond");
+            },
+            ["production directed seam and finite PreWeld PostWeld L bands"] = () =>
+            {
+                var g = Load().ResolveForPreview("PART-001").WorkpieceGeometry;
+                Check(g.SemanticStatus == "Approved" && g.Seams.Count == 1 && g.CleaningRegions.Count == 2, "production semantics missing");
+                var seam = g.Seams[0];
+                var start = new Vec3(-.09446746641944131, .0155, -.044);
+                var end = new Vec3(.09027822178886747, .0155, -.044);
+                Check(seam.Points.Count == 2 && seam.AuthoringEvidence.Contains("project owner"), "selection evidence");
+                Near(seam.Points[0], start, 1e-14);
+                Near(seam.Points[1], end, 1e-14);
+                Check(Math.Abs(seam.ArcLengthsMetres[1] - (end.x - start.x)) < 1e-14, "directed length");
+                Check(g.Surfaces.Single(s => s.Id == seam.SurfaceIds[0]).SourceFace == 4, "horizontal support");
+                Check(g.Surfaces.Single(s => s.Id == seam.AdjacentSurfaceIds[0]).SourceFace == 13, "upright support");
+                Check(g.CleaningRegions.Select(r => r.Phase).OrderBy(x => x).SequenceEqual(new[] { "PostWeld", "PreWeld" }), "distinct pre/post");
+                foreach (var region in g.CleaningRegions)
+                {
+                    foreach (int face in new[]
+                    {
+                        4,
+                        13
+                    }
+
+                    )
+                    {
+                        var triangles = region.Triangles.Where(t => t.SourceFace == face).ToArray();
+                        double area = triangles.Sum(t => Vec3.Cross(t.B - t.A, t.C - t.A).Length / 2);
+                        Check(Math.Abs(area - (end.x - start.x) * .015) < 1e-10, "full finite band area");
+                        foreach (var t in triangles)
+                        {
+                            Near(t.Normal, face == 4 ? new Vec3(0, 1, 0) : new Vec3(0, 0, 1));
+                            foreach (var p in new[]
+                            {
+                                t.A,
+                                t.B,
+                                t.C
+                            }
+
+                            )
+                            {
+                                Check(p.x >= start.x - 1e-10 && p.x <= end.x + 1e-10, "band past seam");
+                                Check(face == 4 ? Math.Abs(p.y - .0155) < 1e-10 && p.z >= -.044 - 1e-10 && p.z <= -.029 + 1e-10 : Math.Abs(p.z + .044) < 1e-10 && p.y >= .0155 - 1e-10 && p.y <= .0305 + 1e-10, "band leaves visible L region");
+                            }
+                        }
+                    }
+
+                    Check(region.Triangles.All(t => t.SourceFace == 4 || t.SourceFace == 13), "opposite face included");
+                }
+            },
+            ["joint adjacent support must exist and be nonparallel"] = () =>
+            {
+                var g = codec.Read<GeometryData>(File.ReadAllText(Path.Combine(directory, "welded_part.geometry.json")));
+                g.seams[0].adjacentSurfaceIds[0] = "unknown";
+                Reject(() => SpatialValidation.Geometry(g), "adjacent");
+                g.seams[0].adjacentSurfaceIds[0] = g.seams[0].surfaceIds[0];
+                Reject(() => SpatialValidation.Geometry(g), "distinct adjacent");
+            },
             ["marker region area rejects gaps between corner probes"] = () =>
             {
                 var r = new MountRegionData
@@ -211,6 +319,7 @@ namespace WeldingTrainer.Content.Spatial.Tests
             {
                 var c = Catalog();
                 var m = c.markers[0];
+                m.printCandidates = Array.Empty<PrintCandidateData>();
                 var b = c.bindings[0];
                 m.dimensionsKnown = true;
                 m.widthMetres = .05;
@@ -326,7 +435,7 @@ namespace WeldingTrainer.Content.Spatial.Tests
                 var s = Load();
                 var b = s.ResolveForPreview("PART-001");
                 Check(b.Marker.WidthMetres == null && b.Marker.LabelThicknessMetres == null, "unknown must be nullable");
-                Check(b.ScoredRegistrationBlockers.Count == 4, "missing blockers");
+                Check(b.ScoredRegistrationBlockers.Count == 3, "missing blockers");
                 Reject(() => s.ResolveForScoredRegistration("PART-001"), "StationUnqualified");
                 Check(s.ToolSetups[0].ToolFromTip == null, "unknown tool offsets exposed");
             },
@@ -402,7 +511,7 @@ namespace WeldingTrainer.Content.Spatial.Tests
             },
             ["stale revisions and missing binding references rejected"] = () =>
             {
-                BadCatalog(c => c.bindings[0].partRevision = 2, "stale");
+                BadCatalog(c => c.bindings[0].partRevision = 99, "stale");
                 BadCatalog(c => c.bindings[0].mountRegionRevision = 2, "stale");
                 BadCatalog(c => c.bindings[0].fixtureId = "unknown", "unknown");
             },
@@ -438,6 +547,7 @@ namespace WeldingTrainer.Content.Spatial.Tests
             ["oversized printed QR rejected"] = () => BadCatalog(c =>
             {
                 c.markers[0].dimensionsKnown = true;
+                c.markers[0].printCandidates = Array.Empty<PrintCandidateData>();
                 c.markers[0].widthMetres = .1;
                 c.markers[0].heightMetres = .1;
                 c.markers[0].quietZoneConvention = "IncludesQuietZone";

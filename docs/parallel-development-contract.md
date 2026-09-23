@@ -57,6 +57,13 @@ Marker payload is bounded versioned UTF-8 with a required partId; the local
 catalog maps it to exactly one approved mounting configuration per partId for
 this MVP. Duplicate active bindings invalidate the catalog; reject ambiguity,
 never add a mount key or pick the first match. This does not authenticate parts.
+Print alternatives are content specifications for that single mounting location,
+not additional bindings or simultaneously observed markers. #46 revision 2 exposes
+read-only PrintCandidates and nullable SelectedPrintCandidateId. #49 must not
+select a candidate by iteration order or treat known candidate dimensions as
+qualified installed-marker metadata. #66 supplies selection and installation
+evidence. Directed seam endpoints and optional second adjacent surface IDs
+remain ordered through the #58 mapping.
 
 A owns tracking-to-world and marker normalization. B transforms tip/head into
 the workpiece frame using the same coherent snapshot. Reject mismatched origin

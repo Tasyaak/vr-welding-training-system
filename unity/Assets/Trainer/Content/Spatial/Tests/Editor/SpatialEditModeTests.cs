@@ -9,6 +9,42 @@ namespace WeldingTrainer.Content.Spatial.Tests
     public sealed class SpatialEditModeTests
     {
         [Test]
+        public void CadCameraPlacesRecessLowerLeftAndDirectedJointLeftToRight()
+        {
+            var go = new GameObject("CAD view test");
+            try
+            {
+                var camera = go.AddComponent<Camera>();
+                camera.aspect = 1.4f;
+                camera.fieldOfView = 45;
+                foreach (bool top in new[]
+                {
+                    true,
+                    false
+                }
+
+                )
+                {
+                    WeldingTrainer.Content.Spatial.Editor.CadPreviewView.Configure(camera, top ? new Vector3(0, .6f, 0) : new Vector3(0, .6f, .13f), new Vector3(0, .02f, 0), top ? Vector3.back : Vector3.up);
+                    var qr = camera.WorldToViewportPoint(new Vector3(-.105f, .0076f, .105f));
+                    var hole = camera.WorldToViewportPoint(new Vector3(0, .0155f, -.060f));
+                    Assert.That(qr.x, Is.LessThan(.5f));
+                    Assert.That(qr.y, Is.LessThan(.5f));
+                    Assert.That(hole.y, Is.GreaterThan(.5f));
+                    var start = camera.WorldToViewportPoint(new Vector3(-.0944674664f, .0155f, -.044f));
+                    var end = camera.WorldToViewportPoint(new Vector3(.0902782218f, .0155f, -.044f));
+                    Assert.That(end.x, Is.GreaterThan(start.x));
+                    Assert.That(camera.worldToCameraMatrix.determinant, Is.EqualTo(1).Within(1e-5));
+                    Assert.That(Vector3.Dot(new Vector3(0, 0, 1), camera.transform.position - new Vector3(0, .0155f, -.044f)), Is.GreaterThan(0));
+                }
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        [Test]
         public void SharedSchemaAndActualSourceSuiteWithUnitySerializer()
         {
             var suite = new SpatialTestCases(Path.GetFullPath(Path.Combine(Application.dataPath, "../..")), new UnitySpatialJson(), value => JsonUtility.ToJson(value));

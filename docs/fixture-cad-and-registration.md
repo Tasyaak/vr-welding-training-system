@@ -36,7 +36,10 @@ manufacturing tolerance or repeatability.
 The fixture has a 90 × 90 mm QR recess: X [-150,-60] mm, Z [60,150] mm,
 floor Y=7.6 mm, surrounding top Y=8.0 mm. Its versioned origin is (-105,7.6,105)
 mm; local axes are +X, -Z, +Y in Fixture. Nominal Marker lies on this floor.
-Printed dimensions, placement and label/plate thickness remain unqualified.
+Two alternative white labels are 90 × 90 mm and 0.1 mm thick, with centered
+53 mm (A) or 63 mm (B) symbols excluding quiet zone. Both encode `LW1:PART-001`.
+Neither is selected; artwork provenance is unavailable. Actual installed plane,
+placement error and print performance remain unqualified under #66.
 
 ## Authoring ownership (#46)
 
@@ -92,16 +95,17 @@ always invalidates output. New session requires a fresh QR registration.
 ## Physical qualification (#66)
 
 Determine and record, rather than invent:
-- printed QR offset/orientation within the CAD recess, dimensions, quiet-zone
-  convention, label thickness and print quality;
+- comparison and selection of QR-PRINT-A/B, verification of their specified
+  dimensions/thickness and print quality, and actual installed plane/offset/orientation;
 - physical deviations from nominal identity and repeatability after rebolting;
 - repeatability and absolute error across independent check positions, viewing
   distances/angles, lighting and controller tip offsets;
 - pinned Quest OS/package tuple, offline capability, drift/recenter/occlusion behavior.
 
-The source solid establishes surfaces/normals but no weld/cleaning selection.
-This separate semantic gap is explicit in `engineering/cad/selections.json`;
-obtain a drawing or approved selection rather than guessing during #66.
+The project owner selected the +Z-visible T-joint at Z=-44 mm, travel +X, and
+15 mm cleaning bands on faces 4 (+Y) and 13 (+Z). The explicit selection is in
+`engineering/cad/selections.json`; `semantic-selection.md` records its authority.
+The bake derives the finite endpoints and clips both PreWeld/PostWeld regions.
 
 Stable marker observations do not prove absolute spatial accuracy. Compare the
 combined marker placement, assembly fit, anchor drift and tool-tip error budget

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "welded_part-geometry",
-  "revision": 1,
+  "revision": 2,
   "frame": "Workpiece",
   "units": "m",
   "sourceSha256": "647e8ce51ce0f02cda545677b969d484517b526841dc4e88a75a8829103f1117",
@@ -37256,8 +37256,354 @@
       }
     }
   ],
-  "seams": [],
-  "cleaningRegions": [],
-  "semanticStatus": "MissingAuthoritativeSelection",
-  "semanticReason": "STEP contains a fused T-shaped solid without a weld procedure, selected joints, travel direction or pre/post-cleaning masks. Obtain an approved drawing or explicit content-author selection before scored use. No CAD edge is automatically a weld seam."
+  "seams": [
+    {
+      "id": "PART-001-T-JOINT",
+      "authoringEvidence": "engineering/cad/semantic-selection.md (project owner, 2026-09-23): QR-visible T-joint, left to right, 15 mm L-shaped PreWeld/PostWeld bands",
+      "points": [
+        {
+          "x": -0.09446746641944131,
+          "y": 0.0155,
+          "z": -0.044000000000000025
+        },
+        {
+          "x": 0.09027822178886748,
+          "y": 0.0155,
+          "z": -0.04400000000000001
+        }
+      ],
+      "surfaceIds": [
+        "welded_part-face-04-triangle-0001"
+      ],
+      "adjacentSurfaceIds": [
+        "welded_part-face-13-triangle-0002"
+      ],
+      "arcLengthsMetres": [
+        0.0,
+        0.18474568820830878
+      ]
+    }
+  ],
+  "cleaningRegions": [
+    {
+      "id": "PART-001-T-JOINT-PreWeld",
+      "phase": "PreWeld",
+      "authoringEvidence": "engineering/cad/semantic-selection.md (project owner, 2026-09-23): QR-visible T-joint, left to right, 15 mm L-shaped PreWeld/PostWeld bands",
+      "surfaceIds": [
+        "welded_part-face-04-triangle-0001",
+        "welded_part-face-04-triangle-0001",
+        "welded_part-face-04-triangle-0002",
+        "welded_part-face-13-triangle-0001",
+        "welded_part-face-13-triangle-0002",
+        "welded_part-face-13-triangle-0002"
+      ],
+      "triangles": [
+        {
+          "id": "PART-001-T-JOINT-PreWeld-1",
+          "sourceFace": 4,
+          "a": {
+            "x": 0.09027822178886748,
+            "y": 0.0155,
+            "z": -0.044
+          },
+          "b": {
+            "x": -0.0944674664,
+            "y": 0.0155,
+            "z": -0.044
+          },
+          "c": {
+            "x": -0.04705860204163308,
+            "y": 0.0155,
+            "z": -0.028999999999999998
+          },
+          "normal": {
+            "x": 0.0,
+            "y": 1.0,
+            "z": 0.0
+          }
+        },
+        {
+          "id": "PART-001-T-JOINT-PreWeld-2",
+          "sourceFace": 4,
+          "a": {
+            "x": 0.09027822178886748,
+            "y": 0.0155,
+            "z": -0.044
+          },
+          "b": {
+            "x": -0.04705860204163308,
+            "y": 0.0155,
+            "z": -0.028999999999999998
+          },
+          "c": {
+            "x": 0.09027822178886748,
+            "y": 0.0155,
+            "z": -0.028999999999999998
+          },
+          "normal": {
+            "x": 0.0,
+            "y": 1.0,
+            "z": 0.0
+          }
+        },
+        {
+          "id": "PART-001-T-JOINT-PreWeld-3",
+          "sourceFace": 4,
+          "a": {
+            "x": -0.04705860204163306,
+            "y": 0.0155,
+            "z": -0.028999999999999998
+          },
+          "b": {
+            "x": -0.0944674664,
+            "y": 0.0155,
+            "z": -0.044
+          },
+          "c": {
+            "x": -0.0944674664,
+            "y": 0.0155,
+            "z": -0.028999999999999998
+          },
+          "normal": {
+            "x": 0.0,
+            "y": 1.0,
+            "z": 0.0
+          }
+        },
+        {
+          "id": "PART-001-T-JOINT-PreWeld-4",
+          "sourceFace": 13,
+          "a": {
+            "x": 0.03485451534,
+            "y": 0.0305,
+            "z": -0.044
+          },
+          "b": {
+            "x": 0.09027822178886748,
+            "y": 0.015500000003012934,
+            "z": -0.044
+          },
+          "c": {
+            "x": 0.09027822178886748,
+            "y": 0.0305,
+            "z": -0.044
+          },
+          "normal": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 1.0
+          }
+        },
+        {
+          "id": "PART-001-T-JOINT-PreWeld-5",
+          "sourceFace": 13,
+          "a": {
+            "x": -0.0944674664,
+            "y": 0.0305,
+            "z": -0.044
+          },
+          "b": {
+            "x": -0.0944674664,
+            "y": 0.0155,
+            "z": -0.044
+          },
+          "c": {
+            "x": 0.09027822178886748,
+            "y": 0.0155,
+            "z": -0.044
+          },
+          "normal": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 1.0
+          }
+        },
+        {
+          "id": "PART-001-T-JOINT-PreWeld-6",
+          "sourceFace": 13,
+          "a": {
+            "x": -0.0944674664,
+            "y": 0.0305,
+            "z": -0.044
+          },
+          "b": {
+            "x": 0.09027822178886748,
+            "y": 0.015500000003012932,
+            "z": -0.044
+          },
+          "c": {
+            "x": 0.03485451534,
+            "y": 0.0305,
+            "z": -0.044
+          },
+          "normal": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 1.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "PART-001-T-JOINT-PostWeld",
+      "phase": "PostWeld",
+      "authoringEvidence": "engineering/cad/semantic-selection.md (project owner, 2026-09-23): QR-visible T-joint, left to right, 15 mm L-shaped PreWeld/PostWeld bands",
+      "surfaceIds": [
+        "welded_part-face-04-triangle-0001",
+        "welded_part-face-04-triangle-0001",
+        "welded_part-face-04-triangle-0002",
+        "welded_part-face-13-triangle-0001",
+        "welded_part-face-13-triangle-0002",
+        "welded_part-face-13-triangle-0002"
+      ],
+      "triangles": [
+        {
+          "id": "PART-001-T-JOINT-PostWeld-1",
+          "sourceFace": 4,
+          "a": {
+            "x": 0.09027822178886748,
+            "y": 0.0155,
+            "z": -0.044
+          },
+          "b": {
+            "x": -0.0944674664,
+            "y": 0.0155,
+            "z": -0.044
+          },
+          "c": {
+            "x": -0.04705860204163308,
+            "y": 0.0155,
+            "z": -0.028999999999999998
+          },
+          "normal": {
+            "x": 0.0,
+            "y": 1.0,
+            "z": 0.0
+          }
+        },
+        {
+          "id": "PART-001-T-JOINT-PostWeld-2",
+          "sourceFace": 4,
+          "a": {
+            "x": 0.09027822178886748,
+            "y": 0.0155,
+            "z": -0.044
+          },
+          "b": {
+            "x": -0.04705860204163308,
+            "y": 0.0155,
+            "z": -0.028999999999999998
+          },
+          "c": {
+            "x": 0.09027822178886748,
+            "y": 0.0155,
+            "z": -0.028999999999999998
+          },
+          "normal": {
+            "x": 0.0,
+            "y": 1.0,
+            "z": 0.0
+          }
+        },
+        {
+          "id": "PART-001-T-JOINT-PostWeld-3",
+          "sourceFace": 4,
+          "a": {
+            "x": -0.04705860204163306,
+            "y": 0.0155,
+            "z": -0.028999999999999998
+          },
+          "b": {
+            "x": -0.0944674664,
+            "y": 0.0155,
+            "z": -0.044
+          },
+          "c": {
+            "x": -0.0944674664,
+            "y": 0.0155,
+            "z": -0.028999999999999998
+          },
+          "normal": {
+            "x": 0.0,
+            "y": 1.0,
+            "z": 0.0
+          }
+        },
+        {
+          "id": "PART-001-T-JOINT-PostWeld-4",
+          "sourceFace": 13,
+          "a": {
+            "x": 0.03485451534,
+            "y": 0.0305,
+            "z": -0.044
+          },
+          "b": {
+            "x": 0.09027822178886748,
+            "y": 0.015500000003012934,
+            "z": -0.044
+          },
+          "c": {
+            "x": 0.09027822178886748,
+            "y": 0.0305,
+            "z": -0.044
+          },
+          "normal": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 1.0
+          }
+        },
+        {
+          "id": "PART-001-T-JOINT-PostWeld-5",
+          "sourceFace": 13,
+          "a": {
+            "x": -0.0944674664,
+            "y": 0.0305,
+            "z": -0.044
+          },
+          "b": {
+            "x": -0.0944674664,
+            "y": 0.0155,
+            "z": -0.044
+          },
+          "c": {
+            "x": 0.09027822178886748,
+            "y": 0.0155,
+            "z": -0.044
+          },
+          "normal": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 1.0
+          }
+        },
+        {
+          "id": "PART-001-T-JOINT-PostWeld-6",
+          "sourceFace": 13,
+          "a": {
+            "x": -0.0944674664,
+            "y": 0.0305,
+            "z": -0.044
+          },
+          "b": {
+            "x": 0.09027822178886748,
+            "y": 0.015500000003012932,
+            "z": -0.044
+          },
+          "c": {
+            "x": 0.03485451534,
+            "y": 0.0305,
+            "z": -0.044
+          },
+          "normal": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 1.0
+          }
+        }
+      ]
+    }
+  ],
+  "semanticStatus": "Approved",
+  "semanticReason": "Explicit project-owner selection recorded in engineering/cad/semantic-selection.md; physical station remains unqualified."
 }

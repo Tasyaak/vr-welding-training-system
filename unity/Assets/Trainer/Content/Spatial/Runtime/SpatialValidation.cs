@@ -172,7 +172,35 @@ namespace WeldingTrainer.Content.Spatial
                     Text(m.installationEvidence, m.id);
                 }
                 else
-                    Require(m.labelThicknessMetres == 0 && string.IsNullOrEmpty(m.installationEvidence), m.id, "unknown plane must not claim physical evidence/thickness");
+                    Require(string.IsNullOrEmpty(m.installationEvidence), m.id, "unknown plane must not claim physical evidence");
+                Require(m.labelThicknessMetres >= 0, m.id, "negative label thickness");
+                var candidates = Index(m.printCandidates ?? Array.Empty<PrintCandidateData>(), x => x.id, m.id + ".printCandidates");
+                foreach (var candidate in candidates.Values)
+                {
+                    Require(candidate.schemaVersion == 1, candidate.id, "unsupported print specification schema");
+                    Revision(candidate.revision, candidate.id);
+                    Text(candidate.specificationEvidence, candidate.id);
+                    Positive(candidate.labelWidthMetres, candidate.id);
+                    Positive(candidate.labelHeightMetres, candidate.id);
+                    Positive(candidate.labelThicknessMetres, candidate.id);
+                    Positive(candidate.symbolWidthMetres, candidate.id);
+                    Positive(candidate.symbolHeightMetres, candidate.id);
+                    Require(candidate.symbolWidthMetres < candidate.labelWidthMetres && candidate.symbolHeightMetres < candidate.labelHeightMetres, candidate.id, "symbol must fit inside white label with margin");
+                    Require(candidate.symbolCentered, candidate.id, "v1 print specification requires centered symbol");
+                    Require(candidate.symbolQuietZoneConvention == "ExcludesQuietZone", candidate.id, "symbol size must explicitly exclude quiet zone");
+                    Require(candidate.artworkProvenance == "NotSupplied", candidate.id, "v1 has no supplied digital artwork provenance; do not fabricate it");
+                    Require(candidate.payload != null && candidate.payload.StartsWith(m.payloadPrefix, StringComparison.Ordinal), candidate.id, "payload prefix mismatch");
+                    Id(candidate.payload.Substring(m.payloadPrefix.Length), candidate.id + ".payload partId");
+                }
+
+                if (!string.IsNullOrEmpty(m.selectedPrintCandidateId))
+                {
+                    Require(candidates.ContainsKey(m.selectedPrintCandidateId), m.id, "selected print candidate not found");
+                    var selected = candidates[m.selectedPrintCandidateId];
+                    Require(m.dimensionsKnown && m.widthMetres == selected.symbolWidthMetres && m.heightMetres == selected.symbolHeightMetres && m.labelThicknessMetres == selected.labelThicknessMetres && m.quietZoneConvention == selected.symbolQuietZoneConvention, m.id, "selected marker metadata must match print candidate");
+                }
+                else if (candidates.Count > 0)
+                    Require(!m.dimensionsKnown && !m.physicalPlaneKnown && m.labelThicknessMetres == 0, m.id, "unselected candidates must not populate installed marker metadata");
             }
 
             var active = new HashSet<string>(StringComparer.Ordinal);
@@ -185,6 +213,12 @@ namespace WeldingTrainer.Content.Spatial
                 var f = fixtures[b.fixtureId];
                 var m = markers[b.markerId];
                 var r = f.markerMountRegion;
+                foreach (var candidate in m.printCandidates ?? Array.Empty<PrintCandidateData>())
+                {
+                    Require(candidate.payload == m.payloadPrefix + b.partId, candidate.id, "candidate payload must identify bound part");
+                    Require(candidate.labelWidthMetres <= r.widthMetres + LengthTolerance && candidate.labelHeightMetres <= r.heightMetres + LengthTolerance, candidate.id, "physical white label extends beyond mount region");
+                }
+
                 Require(b.partRevision == p.revision && b.fixtureRevision == f.revision && b.markerRevision == m.revision && b.mountRegionId == r.id && b.mountRegionRevision == r.revision, b.id, "stale referenced revision or region");
                 Require(!b.active || active.Add(b.partId), b.id, "duplicate active binding for part " + b.partId);
                 Pose(b.fixtureFromWorkpiece, "Fixture", "Workpiece", b.id + ".fixtureFromWorkpiece");
@@ -221,7 +255,8 @@ namespace WeldingTrainer.Content.Spatial
 
                         )
                         {
-                            var corner = local.TransformPoint(new Vec3(x * m.widthMetres, y * m.heightMetres, 0));
+                            var selected = (m.printCandidates ?? Array.Empty<PrintCandidateData>()).FirstOrDefault(p => p.id == m.selectedPrintCandidateId);
+                            var corner = local.TransformPoint(new Vec3(x * (selected?.labelWidthMetres ?? m.widthMetres), y * (selected?.labelHeightMetres ?? m.heightMetres), 0));
                             Require(Math.Abs(corner.x) <= r.widthMetres / 2 + LengthTolerance && Math.Abs(corner.y) <= r.heightMetres / 2 + LengthTolerance, b.id, "printed marker extends beyond mount region");
                         }
             }
@@ -359,6 +394,7 @@ namespace WeldingTrainer.Content.Spatial
                 Require(s.points != null && s.points.Length >= 2, s.id, "directed seam needs at least two points");
                 Require(s.arcLengthsMetres != null && s.arcLengthsMetres.Length == s.points.Length && s.surfaceIds != null && s.surfaceIds.Length == s.points.Length - 1, s.id, "seam samples/arc lengths/support count mismatch");
                 Require(s.arcLengthsMetres[0] == 0, s.id, "arc length must start at zero");
+                Require(s.adjacentSurfaceIds == null || s.adjacentSurfaceIds.Length == 0 || s.adjacentSurfaceIds.Length == s.surfaceIds.Length, s.id, "adjacent joint support count mismatch");
                 double arc = 0;
                 for (int i = 0; i < s.points.Length; i++)
                 {
@@ -374,6 +410,12 @@ namespace WeldingTrainer.Content.Spatial
                     var surface = surfaces[s.surfaceIds[i - 1]];
                     Require(Contains(surface, s.points[i - 1]) && Contains(surface, s.points[i]), s.id, "seam segment leaves finite surface");
                     Require(Vec3.Cross(surface.normal, delta * (1 / delta.Length)).Length > 1e-6, s.id, "degenerate seam frame");
+                    if (s.adjacentSurfaceIds != null && s.adjacentSurfaceIds.Length > 0)
+                    {
+                        Require(surfaces.ContainsKey(s.adjacentSurfaceIds[i - 1] ?? ""), s.id, "unknown adjacent joint surface");
+                        var adjacent = surfaces[s.adjacentSurfaceIds[i - 1]];
+                        Require(Contains(adjacent, s.points[i - 1]) && Contains(adjacent, s.points[i]) && Vec3.Cross(surface.normal, adjacent.normal).Length > 1e-6, s.id, "joint seam must lie on two distinct adjacent surfaces");
+                    }
                 }
             }
 

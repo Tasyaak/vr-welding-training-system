@@ -12,6 +12,7 @@ from OCP.TopLoc import TopLoc_Location
 from OCP.TopAbs import TopAbs_FACE, TopAbs_REVERSED
 from OCP.TopoDS import TopoDS
 from inspect_step import read, explore
+from author_joint import author
 
 ROOT = Path(__file__).resolve().parents[2]
 OUTPUT = Path('unity/Assets/Trainer/Content/Spatial/Generated')
@@ -76,6 +77,11 @@ def convert(name):
     if selection['sourceSha256'] != SOURCES[name] or selection['units'] != 'm':
         raise ValueError(f'{name}: semantic selection source/units mismatch')
     seams = selection['seams']
+    cleaning = selection['cleaningRegions']
+    if 'joint' in selection:
+        if seams or cleaning:
+            raise ValueError('Joint recipe cannot be mixed with manually baked semantics')
+        seams, cleaning = author(shape, surfaces, selection)
     for seam in seams:
         arc = [0.0]
         for a, b in zip(seam['points'], seam['points'][1:]):
@@ -85,7 +91,7 @@ def convert(name):
                     sourceSha256=SOURCES[name], closedSolid=True, surfaces=surfaces, seams=[], cleaningRegions=[],
                     semanticStatus=selection['semanticStatus'], semanticReason=selection['semanticReason'])
     geometry['seams'] = seams
-    geometry['cleaningRegions'] = selection['cleaningRegions']
+    geometry['cleaningRegions'] = cleaning
     visual = dict(schemaVersion=1, frame=frame, units='m', vertices=vertices, triangles=indices)
     return {f'{name}.geometry.json': encode(geometry), f'{name}.visual.json': encode(visual)}
 
@@ -100,7 +106,8 @@ def build():
                            revision=1, units='mm') for name, identity in SOURCES.items()]
     catalog = json.loads((ROOT / 'engineering/cad/authoring.json').read_text())
     catalog['bakeInputs'] = [dict(path=path, sha256=sha((ROOT / path).read_bytes())) for path in (
-        'tools/cad/bake.py', 'tools/cad/inspect_step.py', 'tools/cad/requirements.txt',
+        'tools/cad/bake.py', 'tools/cad/author_joint.py', 'tools/cad/inspect_step.py', 'tools/cad/requirements.txt',
+        'engineering/cad/semantic-selection.md',
         'engineering/cad/authoring.json', 'engineering/cad/selections.json')]
     catalog['sources'] = source_records
     catalog['imports'] = [dict(sourceId=name, converter='cadquery-ocp-novtk', converterVersion=VERSION,
