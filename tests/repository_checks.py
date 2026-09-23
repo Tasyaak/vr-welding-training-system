@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 from pathlib import Path
@@ -84,14 +85,44 @@ def check_dev_agent_settings(errors: list[str]) -> None:
 
 
 def check_training_test_isolation(errors: list[str]) -> None:
-    build = (ROOT / "unity/ProjectSettings/EditorBuildSettings.asset").read_text(encoding="utf-8")
+    build_path = ROOT / "unity/ProjectSettings/EditorBuildSettings.asset"
+    build = build_path.read_text(encoding="utf-8")
+
     if "TrainingTest/FakeTraining.unity" in build:
         errors.append("FakeTraining scene must not be included in release Build Settings")
-    fake = ROOT / "unity/Assets/Trainer/Scenes/TrainingTest/FakeTraining.unity"
-    if fake.is_file() and fake.read_text(encoding="utf-8").count(
+
+    fake_scene = ROOT / "unity/Assets/Trainer/Scenes/TrainingTest/FakeTraining.unity"
+    if fake_scene.is_file() and fake_scene.read_text(encoding="utf-8").count(
         "WeldingTrainer.TrainingTest.FakeTrainingComposition"
     ) != 1:
         errors.append("FakeTraining scene must contain exactly one fake composition")
+
+    fake_asmdef = (
+        ROOT
+        / "unity/Assets/Trainer/Scenes/TrainingTest/WeldingTrainer.TrainingTest.asmdef"
+    )
+    if fake_asmdef.is_file():
+        try:
+            data = json.loads(fake_asmdef.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            errors.append(f"TrainingTest asmdef is invalid JSON: {exc}")
+        else:
+            include_platforms = data.get("includePlatforms")
+            if include_platforms != ["Editor"]:
+                errors.append(
+                    "WeldingTrainer.TrainingTest must be Editor-only so synthetic-valid "
+                    "providers cannot compile into the Quest player"
+                )
+            if data.get("autoReferenced") is not False:
+                errors.append(
+                    "WeldingTrainer.TrainingTest must keep autoReferenced=false"
+                )
+
+    bootstrap = ROOT / "unity/Assets/Trainer/Scenes/Bootstrap.unity"
+    if bootstrap.is_file():
+        bootstrap_text = bootstrap.read_text(encoding="utf-8")
+        if "WeldingTrainer.TrainingTest.FakeTrainingComposition" in bootstrap_text:
+            errors.append("Production Bootstrap must not contain FakeTrainingComposition")
 
 
 def main() -> int:

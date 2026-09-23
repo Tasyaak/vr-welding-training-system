@@ -1,22 +1,327 @@
 using System;
-using System.Collections.Generic;
 
 namespace WeldingTrainer.Domain
 {
-    public enum ProcessMode { Fusion, Wobble, Pulsed, PreWeldCleaning, PostWeldCleaning }
-    public enum SessionState { Idle, Initializing, Registering, Selecting, Ready, Running, Suspended, Saving, Reviewing, Completed, Aborted, Faulted }
-    public enum ActivationState { Inhibited, ResetRequired, ReadyDisarmed, Armed, Active }
-    public enum NozzleState { Unknown, Welding, Cleaning }
-    public enum ClampState { Disconnected, Connected }
-    [Flags] public enum BlockReason : ulong { None=0, NoSession=1, RegistrationInvalid=2, OriginMismatch=4, HeadInvalid=8, ToolInvalid=16, StaleInput=32, NozzleUnknown=64, NozzleMismatch=128, ClampDisconnected=256, SafetyUnknown=512, SafetyRejected=1024, RecorderUnavailable=2048, TriggerReleaseRequired=4096, EmergencyStop=8192, FaultLatched=16384 }
+    public enum ProcessMode
+    {
+        Fusion,
+        Wobble,
+        Pulsed,
+        PreWeldCleaning,
+        PostWeldCleaning
+    }
 
-    public readonly struct Vec3 { public readonly double X,Y,Z; public Vec3(double x,double y,double z){X=x;Y=y;Z=z;} public bool Finite=>double.IsFinite(X)&&double.IsFinite(Y)&&double.IsFinite(Z); }
-    public readonly struct Quat { public readonly double X,Y,Z,W; public Quat(double x,double y,double z,double w){X=x;Y=y;Z=z;W=w;} public bool Finite=>double.IsFinite(X)&&double.IsFinite(Y)&&double.IsFinite(Z)&&double.IsFinite(W); }
-    public readonly struct RigidPose { public readonly string DestinationFrame,SourceFrame; public readonly Vec3 PositionMetres; public readonly Quat Rotation; public RigidPose(string destination,string source,Vec3 p,Quat q){DestinationFrame=destination;SourceFrame=source;PositionMetres=p;Rotation=q;} }
-    public sealed class ProcessProfile { public string Id{get;} public int Version{get;} public ProcessMode Mode{get;} public string Hash{get;} public double MaximumSampleGapSeconds{get;} public ProcessProfile(string id,int version,ProcessMode mode,string hash,double maxGap){if(string.IsNullOrWhiteSpace(id)||version<1||string.IsNullOrWhiteSpace(hash)||maxGap<=0)throw new ArgumentException("Invalid profile");Id=id;Version=version;Mode=mode;Hash=hash;MaximumSampleGapSeconds=maxGap;} }
-    public sealed class ProcessConfiguration { public const int SchemaVersion=1; public string FixtureId{get;} public string SeamId{get;} public ProcessProfile Profile{get;} public string SourceAttemptId{get;} public ProcessConfiguration(string fixture,string seam,ProcessProfile profile,string sourceAttempt=null){FixtureId=fixture??throw new ArgumentNullException(nameof(fixture));SeamId=seam??throw new ArgumentNullException(nameof(seam));Profile=profile??throw new ArgumentNullException(nameof(profile));SourceAttemptId=sourceAttempt;} }
-    public sealed class AttemptConfiguration { public string AttemptId{get;} public ProcessConfiguration Process{get;} public long RegistrationGeneration{get;} public AttemptConfiguration(string id,ProcessConfiguration process,long generation){AttemptId=id;Process=process;RegistrationGeneration=generation;} }
-    public sealed class ProcessSnapshot { public long Sequence{get;} public string SessionId{get;} public string AttemptId{get;} public SessionState Session{get;} public ActivationState Activation{get;} public NozzleState Nozzle{get;} public ClampState Clamp{get;} public BlockReason Reasons{get;} public bool Requested{get;} public bool Permission=>Activation==ActivationState.Armed||Activation==ActivationState.Active; public ProcessSnapshot(long seq,string session,string attempt,SessionState state,ActivationState activation,NozzleState nozzle,ClampState clamp,BlockReason reasons,bool requested){Sequence=seq;SessionId=session;AttemptId=attempt;Session=state;Activation=activation;Nozzle=nozzle;Clamp=clamp;Reasons=reasons;Requested=requested;} }
-    public enum ProcessEventType { SessionStarted,StateChanged,RegistrationAccepted,AttemptPrepared,NozzleChanged,ClampChanged,Armed,Disarmed,Suspended,Resumed,SavingStarted,ReviewReady,SaveFailed,EmergencyStop,EmergencyReset,SessionCompleted,SessionAborted }
-    public sealed class ProcessEvent { public const int SchemaVersion=1; public long Sequence{get;} public double MonotonicSeconds{get;} public string SessionId{get;} public string AttemptId{get;} public long InputGeneration{get;} public long RegistrationGeneration{get;} public string ProfileHash{get;} public ProcessEventType Type{get;} public string Payload{get;} public ProcessEvent(long sequence,double time,string session,string attempt,long inputGen,long registrationGen,string profileHash,ProcessEventType type,string payload){Sequence=sequence;MonotonicSeconds=time;SessionId=session;AttemptId=attempt;InputGeneration=inputGen;RegistrationGeneration=registrationGen;ProfileHash=profileHash;Type=type;Payload=payload??"";} }
+    public enum SessionState
+    {
+        Idle,
+        Initializing,
+        Registering,
+        Selecting,
+        Ready,
+        Running,
+        Suspended,
+        Saving,
+        Reviewing,
+        Completed,
+        Aborted,
+        Faulted
+    }
+
+    public enum ActivationState
+    {
+        Inhibited,
+        ResetRequired,
+        ReadyDisarmed,
+        Armed,
+        Active
+    }
+
+    public enum NozzleState
+    {
+        Unknown,
+        Welding,
+        Cleaning
+    }
+
+    public enum ClampState
+    {
+        Disconnected,
+        Connected
+    }
+
+    [Flags]
+    public enum BlockReason : ulong
+    {
+        None = 0,
+        NoSession = 1,
+        RegistrationInvalid = 2,
+        OriginMismatch = 4,
+        HeadInvalid = 8,
+        ToolInvalid = 16,
+        StaleInput = 32,
+        NozzleUnknown = 64,
+        NozzleMismatch = 128,
+        ClampDisconnected = 256,
+        SafetyUnknown = 512,
+        SafetyRejected = 1024,
+        RecorderUnavailable = 2048,
+        TriggerReleaseRequired = 4096,
+        EmergencyStop = 8192,
+        FaultLatched = 16384,
+
+        // Added without renumbering the existing schema-v1 flags.
+        InputUnavailable = 32768,
+        SystemInvalid = 65536,
+        RegistrationChanged = 131072,
+        FixtureMismatch = 262144
+    }
+
+    public readonly struct Vec3
+    {
+        public readonly double X;
+        public readonly double Y;
+        public readonly double Z;
+
+        public Vec3(double x, double y, double z)
+        {
+            X = x;
+            Y = y;
+            Z = z;
+        }
+
+        public bool Finite =>
+            double.IsFinite(X) &&
+            double.IsFinite(Y) &&
+            double.IsFinite(Z);
+    }
+
+    public readonly struct Quat
+    {
+        public readonly double X;
+        public readonly double Y;
+        public readonly double Z;
+        public readonly double W;
+
+        public Quat(double x, double y, double z, double w)
+        {
+            X = x;
+            Y = y;
+            Z = z;
+            W = w;
+        }
+
+        public bool Finite =>
+            double.IsFinite(X) &&
+            double.IsFinite(Y) &&
+            double.IsFinite(Z) &&
+            double.IsFinite(W);
+    }
+
+    public readonly struct RigidPose
+    {
+        public readonly string DestinationFrame;
+        public readonly string SourceFrame;
+        public readonly Vec3 PositionMetres;
+        public readonly Quat Rotation;
+
+        public RigidPose(
+            string destination,
+            string source,
+            Vec3 positionMetres,
+            Quat rotation)
+        {
+            if (string.IsNullOrWhiteSpace(destination))
+                throw new ArgumentException("Destination frame is required.", nameof(destination));
+            if (string.IsNullOrWhiteSpace(source))
+                throw new ArgumentException("Source frame is required.", nameof(source));
+            if (!positionMetres.Finite || !rotation.Finite)
+                throw new ArgumentException("Rigid pose must contain only finite values.");
+
+            DestinationFrame = destination;
+            SourceFrame = source;
+            PositionMetres = positionMetres;
+            Rotation = rotation;
+        }
+    }
+
+    public sealed class ProcessProfile
+    {
+        public string Id { get; }
+        public int Version { get; }
+        public ProcessMode Mode { get; }
+        public string Hash { get; }
+        public double MaximumSampleGapSeconds { get; }
+
+        public ProcessProfile(
+            string id,
+            int version,
+            ProcessMode mode,
+            string hash,
+            double maximumSampleGapSeconds)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+                throw new ArgumentException("Profile ID is required.", nameof(id));
+            if (version < 1)
+                throw new ArgumentOutOfRangeException(nameof(version));
+            if (string.IsNullOrWhiteSpace(hash))
+                throw new ArgumentException("Profile hash is required.", nameof(hash));
+            if (!Enum.IsDefined(typeof(ProcessMode), mode))
+                throw new ArgumentOutOfRangeException(nameof(mode));
+            if (!double.IsFinite(maximumSampleGapSeconds) || maximumSampleGapSeconds <= 0d)
+                throw new ArgumentOutOfRangeException(nameof(maximumSampleGapSeconds));
+
+            Id = id;
+            Version = version;
+            Mode = mode;
+            Hash = hash;
+            MaximumSampleGapSeconds = maximumSampleGapSeconds;
+        }
+    }
+
+    public sealed class ProcessConfiguration
+    {
+        public const int SchemaVersion = 1;
+
+        public string FixtureId { get; }
+        public string SeamId { get; }
+        public ProcessProfile Profile { get; }
+        public string SourceAttemptId { get; }
+
+        public ProcessConfiguration(
+            string fixture,
+            string seam,
+            ProcessProfile profile,
+            string sourceAttempt = null)
+        {
+            if (string.IsNullOrWhiteSpace(fixture))
+                throw new ArgumentException("Fixture ID is required.", nameof(fixture));
+            if (string.IsNullOrWhiteSpace(seam))
+                throw new ArgumentException("Seam ID is required.", nameof(seam));
+
+            FixtureId = fixture;
+            SeamId = seam;
+            Profile = profile ?? throw new ArgumentNullException(nameof(profile));
+            SourceAttemptId = sourceAttempt;
+        }
+    }
+
+    public sealed class AttemptConfiguration
+    {
+        public string AttemptId { get; }
+        public ProcessConfiguration Process { get; }
+        public long RegistrationGeneration { get; }
+
+        public AttemptConfiguration(
+            string id,
+            ProcessConfiguration process,
+            long registrationGeneration)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+                throw new ArgumentException("Attempt ID is required.", nameof(id));
+
+            AttemptId = id;
+            Process = process ?? throw new ArgumentNullException(nameof(process));
+            RegistrationGeneration = registrationGeneration;
+        }
+    }
+
+    public sealed class ProcessSnapshot
+    {
+        public long Sequence { get; }
+        public string SessionId { get; }
+        public string AttemptId { get; }
+        public SessionState Session { get; }
+        public ActivationState Activation { get; }
+        public NozzleState Nozzle { get; }
+        public ClampState Clamp { get; }
+        public BlockReason Reasons { get; }
+        public bool Requested { get; }
+
+        public bool Permission =>
+            Activation == ActivationState.Armed ||
+            Activation == ActivationState.Active;
+
+        public ProcessSnapshot(
+            long sequence,
+            string session,
+            string attempt,
+            SessionState state,
+            ActivationState activation,
+            NozzleState nozzle,
+            ClampState clamp,
+            BlockReason reasons,
+            bool requested)
+        {
+            Sequence = sequence;
+            SessionId = session;
+            AttemptId = attempt;
+            Session = state;
+            Activation = activation;
+            Nozzle = nozzle;
+            Clamp = clamp;
+            Reasons = reasons;
+            Requested = requested;
+        }
+    }
+
+    public enum ProcessEventType
+    {
+        SessionStarted,
+        StateChanged,
+        RegistrationAccepted,
+        AttemptPrepared,
+        NozzleChanged,
+        ClampChanged,
+        Armed,
+        Disarmed,
+        Suspended,
+        Resumed,
+        SavingStarted,
+        ReviewReady,
+        SaveFailed,
+        EmergencyStop,
+        EmergencyReset,
+        SessionCompleted,
+        SessionAborted
+    }
+
+    public sealed class ProcessEvent
+    {
+        public const int SchemaVersion = 1;
+
+        public long Sequence { get; }
+        public double MonotonicSeconds { get; }
+        public string SessionId { get; }
+        public string AttemptId { get; }
+        public long InputGeneration { get; }
+        public long RegistrationGeneration { get; }
+        public string ProfileHash { get; }
+        public ProcessEventType Type { get; }
+        public string Payload { get; }
+
+        public ProcessEvent(
+            long sequence,
+            double time,
+            string session,
+            string attempt,
+            long inputGeneration,
+            long registrationGeneration,
+            string profileHash,
+            ProcessEventType type,
+            string payload)
+        {
+            if (!double.IsFinite(time))
+                throw new ArgumentOutOfRangeException(nameof(time));
+
+            Sequence = sequence;
+            MonotonicSeconds = time;
+            SessionId = session;
+            AttemptId = attempt;
+            InputGeneration = inputGeneration;
+            RegistrationGeneration = registrationGeneration;
+            ProfileHash = profileHash;
+            Type = type;
+            Payload = payload ?? string.Empty;
+        }
+    }
 }
