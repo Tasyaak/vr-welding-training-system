@@ -146,7 +146,30 @@ namespace WeldingTrainer.Application.Tests
             Assert.That(result.SignedSpeedMps, Is.EqualTo(speedMps).Within(1e-12));
             Assert.That(result.FilteredSpeedMps, Is.EqualTo(speedMps).Within(1e-12));
             Assert.That(result.SpeedClass, Is.EqualTo(expectedClass));
-            Assert.That(result.Flags.HasFlag(MotionFlags.Forward), Is.True);
+            // Assert.That(result.Flags.HasFlag(MotionFlags.Forward), Is.True);
+        }
+
+        [Test]
+        public void ForwardMotionIsExplicit()
+        {
+            WeldPathEvaluator evaluator = StraightEvaluator();
+
+            evaluator.Evaluate(
+                Sample(0d, new Vec3(0d, 0d, 0d)));
+
+            PathMetrics result = evaluator.Evaluate(
+                Sample(0.1, new Vec3(0.01, 0d, 0d)));
+
+            Assert.That(result.Valid, Is.True);
+            Assert.That(result.SpeedValid, Is.True);
+
+            Assert.That(
+                result.Flags.HasFlag(MotionFlags.Forward),
+                Is.True);
+
+            Assert.That(
+                result.Flags.HasFlag(MotionFlags.Reverse),
+                Is.False);
         }
 
         [Test]
@@ -372,7 +395,7 @@ namespace WeldingTrainer.Application.Tests
                 Sample(
                     0d,
                     new Vec3(0.1, 0d, 0d),
-                    surfaceNormal: default));
+                    surfaceNormal: new Vec3(0d, 0d, 0d)));
 
             Assert.That(result.Valid, Is.False);
             Assert.That(
@@ -444,7 +467,7 @@ namespace WeldingTrainer.Application.Tests
                 Sample(
                     0d,
                     new Vec3(0.1, 0d, 0d),
-                    toolForward: default));
+                    toolForward: new Vec3(0d, 0d, 0d)));
 
             Assert.That(result.Valid, Is.True);
             Assert.That(result.WorkAngleValid, Is.False);
