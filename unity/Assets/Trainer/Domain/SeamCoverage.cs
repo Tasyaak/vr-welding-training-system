@@ -26,6 +26,9 @@ namespace WeldingTrainer.Domain
             return Snapshot();
         }
         public CoverageSnapshot Stop(){Close(CoverageCloseReason.ExplicitStop);return Snapshot();}
+        public CoverageSnapshot Current=>Snapshot();
+        public CoverageSnapshot AddAttributedInterval(double startArcMetres,double endArcMetres,CoverageQuality quality)
+        {double start=Math.Max(0,Math.Min(startArcMetres,endArcMetres)),end=Math.Min(seam.LengthMetres,Math.Max(startArcMetres,endArcMetres));if(end-start<=1e-9)return Snapshot();segmentId++;ApplyInterval(start,end,quality,segmentId);revision++;closeReason=CoverageCloseReason.None;return Snapshot();}
         void Close(CoverageCloseReason reason){if(anchored){anchored=false;revision++;}closeReason=reason;}
         void ApplyInterval(double start,double end,CoverageQuality quality,int currentSegment)
         {var boundaries=new SortedSet<double>{start,end};foreach(var x in intervals){boundaries.Add(x.StartArcMetres);boundaries.Add(x.EndArcMetres);}double[] values=boundaries.ToArray();var next=new List<CoverageInterval>();for(int i=0;i<values.Length-1;i++){double a=values[i],b=values[i+1];if(b-a<=1e-10)continue;CoverageInterval? old=intervals.Where(x=>x.StartArcMetres<=a+1e-10&&x.EndArcMetres>=b-1e-10).Select(x=>(CoverageInterval?)x).FirstOrDefault();bool covered=a>=start-1e-10&&b<=end+1e-10;if(!old.HasValue&&!covered)continue;CoverageQuality q=old.HasValue?old.Value.Quality:quality;int visits=old.HasValue?old.Value.Visits:0,owner=old.HasValue?old.Value.SegmentId:currentSegment;if(covered){visits++;if(quality==CoverageQuality.Poor)q=CoverageQuality.Poor;owner=currentSegment;}AppendMerged(next,new CoverageInterval(a,b,q,visits,owner));}if(next.Count>maximumIntervals)throw new InvalidOperationException("Coverage interval limit exceeded");intervals=next;}
