@@ -27,13 +27,18 @@ part of the MVP. Training works offline after installation.
 
 ## Current implementation
 
-Audited main: `ee8999eb4562c9f0c77e66b5b38acdfab1a7dea2`.
+Spatial implementation baseline: `24ff28d75b1a2903fb5716cbf4be6e7e52a2f119`.
 
 The integrated code is `unity/Assets/Trainer/Development/Prototype/PrototypeWeldingDemo.cs`
 and the Bootstrap scene with OVRCameraRig, MRUK and passthrough. The prototype
 uses a camera-relative straight seam and does not implement production QR
-registration, process state or persistence. The production layers are planned,
-not already shipped. Existing unmerged PRs are not prerequisites for this plan.
+registration, process state or persistence. Group A content now lives in
+`Content/Spatial`: supplied CAD, deterministic conversion, finite surfaces,
+QR recess, versioned assembly catalog and validation. The supplied content is
+unqualified for scoring: two known QR print candidates await selection and
+physical installation qualification under #66. The owner-selected directed
+T-joint and finite pre/post cleaning bands are now authored. Runtime registration and training integration remain
+separate issues. Existing unmerged PRs are not prerequisites.
 
 ## Parallel delivery
 
@@ -63,6 +68,8 @@ QR tracking in the scene. The actual configuration is part of #49.
 - [Project description](docs/laser-welding-training-project-description.md)
 - [Architecture](docs/architecture.md) and [coordinate conventions](docs/coordinate-conventions.md)
 - [CAD and fixture registration](docs/fixture-cad-and-registration.md)
+- [Spatial authoring, reproducible bake and schema](docs/spatial-content-authoring.md)
+- [Spatial verification and remaining qualification](docs/spatial-content-verification.md)
 - [Migration history](docs/quest-only-migration.md)
 - [Prototype runbook](docs/tomorrow-prototype-runbook.md)
 

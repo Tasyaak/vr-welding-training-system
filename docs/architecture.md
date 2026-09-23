@@ -95,9 +95,14 @@ visible in metrics; output/coverage cannot bridge unknown samples.
 
 ## Testing and implementation state
 
-Main ee8999e contains only the demo code and Quest scene; production logic,
-authoring assets and model tests are still to be implemented. Current CI checks
-repository hygiene, not device functionality.
+Baseline main ee8999e contained only demo code and the Quest scene. #46 adds
+independent Content/Spatial assemblies, original CAD, reproducible finite meshes,
+versioned marker/assembly authoring, validation and immutable export. See
+[the spatial workflow](spatial-content-authoring.md). Bootstrap remains the demo;
+content does not implement runtime registration or training. CI verifies hygiene,
+provenance and pure spatial tests; the pinned local CAD rebake verifies deterministic
+conversion. Unity EditMode
+checks import/serialization. None of these proves device accuracy.
 
 Group A runs adapter/transform/catalog tests and Quest registration qualification.
 Group B runs pure math/state tests, fake-port integration and PlayMode presentation

@@ -28,3 +28,8 @@
 *.mp4 binary
 *.zip binary
 *.apk binary
+# Original engineering bytes must preserve their source identity (including CRLF).
+*.step binary
+# Hashed bake products are UTF-8/LF on every checkout.
+*.spatial text eol=lf
+unity/Assets/Trainer/Content/Spatial/Generated/*.json linguist-generated=true

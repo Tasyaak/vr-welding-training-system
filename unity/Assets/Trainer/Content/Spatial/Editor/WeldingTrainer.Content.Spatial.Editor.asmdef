@@ -1,0 +1,7 @@
+{
+  "name": "WeldingTrainer.Content.Spatial.Editor",
+  "rootNamespace": "WeldingTrainer.Content.Spatial.Editor",
+  "references": ["WeldingTrainer.Content.Spatial", "WeldingTrainer.Content.Spatial.Unity"],
+  "includePlatforms": ["Editor"],
+  "autoReferenced": false
+}
