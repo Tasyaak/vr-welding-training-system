@@ -1,0 +1,9 @@
+{
+  "name": "WeldingTrainer.Presentation",
+  "rootNamespace": "WeldingTrainer.Presentation",
+  "references": [
+    "WeldingTrainer.Domain",
+    "WeldingTrainer.Application"
+  ],
+  "autoReferenced": false
+}
