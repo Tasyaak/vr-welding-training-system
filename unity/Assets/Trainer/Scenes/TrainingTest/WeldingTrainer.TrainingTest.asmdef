@@ -1,0 +1,13 @@
+{
+  "name": "WeldingTrainer.TrainingTest",
+  "rootNamespace": "WeldingTrainer.TrainingTest",
+  "references": [
+    "WeldingTrainer.Domain",
+    "WeldingTrainer.Application"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "autoReferenced": false,
+  "noEngineReferences": false
+}

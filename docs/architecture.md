@@ -78,6 +78,10 @@ part or silently resume while the trigger is held.
 
 ## Authoritative training state
 
+The concrete Group B state contract and isolated synthetic composition are documented in
+[training-state-and-fake-composition.md](training-state-and-fake-composition.md). Production
+Bootstrap mapping remains exclusively owned by Issue #58.
+
 All modes share one session/process snapshot and activation reducer. Virtual
 clamp Connected is a user preparation state, separate from mechanical bolts
 and from finite-surface contact. Both modes of cleaning require CleaningNozzle;
