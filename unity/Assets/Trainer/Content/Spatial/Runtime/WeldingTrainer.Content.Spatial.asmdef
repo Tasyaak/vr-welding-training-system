@@ -1,0 +1,7 @@
+{
+  "name": "WeldingTrainer.Content.Spatial",
+  "rootNamespace": "WeldingTrainer.Content.Spatial",
+  "references": [],
+  "noEngineReferences": true,
+  "autoReferenced": false
+}

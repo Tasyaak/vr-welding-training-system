@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework Condition="'$(SpatialTargetFramework)' == ''">net9.0</TargetFramework>
+    <TargetFramework Condition="'$(SpatialTargetFramework)' != ''">$(SpatialTargetFramework)</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="../../unity/Assets/Trainer/Content/Spatial/Runtime/*.cs" />
+    <Compile Include="../../unity/Assets/Trainer/Content/Spatial/Tests/Editor/SpatialTestCases.cs" />
+  </ItemGroup>
+</Project>

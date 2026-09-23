@@ -1,0 +1,7 @@
+{
+  "name": "WeldingTrainer.Content.Spatial.Tests",
+  "references": ["WeldingTrainer.Content.Spatial", "WeldingTrainer.Content.Spatial.Unity", "WeldingTrainer.Content.Spatial.Editor"],
+  "includePlatforms": ["Editor"],
+  "optionalUnityReferences": ["TestAssemblies"],
+  "autoReferenced": false
+}
