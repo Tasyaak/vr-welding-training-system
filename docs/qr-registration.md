@@ -262,3 +262,30 @@ QR; tracking loss/recenter/pause; deliberate fresh registration; exit/relaunch w
 no anchor persistence. Run offline and with the left controller off. Record actual
 hardware/OS/content/profile revisions and outcomes. #66 owns printed fixture/QR
 and measured accuracy; #58 owns full training interruption, input and replay tests.
+
+## Host verification record — 2026-09-24
+
+Integration base: main `6ed52ec1a4c23eeef6dfb25de192ce9d91cd8c64`, including
+merged #77 spatial content, #68 training state and #69 path evaluation. The latter
+two keep their own assemblies and tests; #49 adds no references to them. #58 must
+map fresh registration snapshots to their generation/availability contracts.
+
+Repository checks passed, including provenance/metadata/assembly isolation and
+48 spatial cases. On Windows, .NET 9.0.201 passed all 66 shared registration cases. Unity
+6000.3.24f1 EditMode passed all 80 project tests: 65 Application tests, four Spatial
+tests and 11 Registration tests (one executes all 66 shared cases with Unity JSON).
+The suite includes high-rate acquisition, stale/invalid inputs, both selected print
+alternatives in synthetic fixtures, nonidentity transforms, four marker rotations,
+CAD presentation chirality, anchor cancellation/loss and obsolete generations.
+
+The standalone Android ARM64 IL2CPP development APK built successfully using
+`RegistrationPreviewBuilder.BuildAndroid`; Unity exited with code 0. Output and
+logs are local ignored artifacts (`artifacts/registration-preview.apk`,
+`artifacts/49-final-android-build.log`, `artifacts/49-final-editmode.xml`).
+`git diff --check` passed.
+
+No Quest was connected to ADB. Device permission, physical QR bounds/orientation,
+native anchor localization, rendered stereo overlay, occlusion and recenter behavior
+remain untested on hardware. The committed adapter profile is unqualified and the
+real catalog remains blocked by its unselected print and unknown installed plane.
+No host result establishes physical accuracy.
