@@ -84,6 +84,7 @@ namespace WeldingTrainer.Application
         private ClampState _clamp = ClampState.Disconnected;
         private BlockReason _reasons = BlockReason.NoSession;
         private TrainingInput _lastInput;
+        private SafetyInput? _tickSafety;
 
         private bool _hasAcceptedRegistration;
         private bool _emergencyStopLatched;
@@ -245,11 +246,13 @@ namespace WeldingTrainer.Application
             if (_disposed)
                 return;
 
+            _tickSafety = null;
             double now = _clock.Seconds;
             if (!double.IsFinite(now))
             {
                 _activation = ActivationState.Inhibited;
                 _reasons |= BlockReason.SystemInvalid;
+                if (_state == SessionState.Running) _state = SessionState.Suspended;
                 _triggerReleaseRequired = true;
                 _haptics.StopImmediately();
                 Publish(_lastInput);
@@ -329,7 +332,7 @@ namespace WeldingTrainer.Application
             RegistrationInput registration,
             double now)
         {
-            if (_triggerReleaseRequired &&
+            if (_triggerReleaseRequired && input.Available && !input.SystemInvalid &&
                 input.TriggerReleased &&
                 !input.TriggerPressed)
             {
@@ -338,57 +341,49 @@ namespace WeldingTrainer.Application
 
             ApplyRegistrationReplacementSideEffects(registration, now);
 
-            BlockReason reasons = ComputeBlockReasons(
-                input,
-                registration,
-                now,
-                includeEmergencyStop: true,
-                includeTriggerRelease: true);
-
-            if (_state == SessionState.Running)
+            ActivationDecision decision = ActivationReducer.Evaluate(
+                BuildInterlockInputs(input, registration, now, _state == SessionState.Running));
+            _activation = decision.State;
+            _reasons = decision.Reasons;
+            if (_state == SessionState.Running && !decision.Permission)
             {
-                if (reasons != BlockReason.None)
-                {
-                    _activation = _emergencyStopLatched
-                        ? ActivationState.ResetRequired
-                        : ActivationState.Inhibited;
-
-                    _triggerReleaseRequired = true;
-                    _haptics.StopImmediately();
-
-                    Transition(
-                        SessionState.Suspended,
-                        ProcessEventType.Suspended,
-                        reasons.ToString(),
-                        now);
-                }
-                else
-                {
-                    _activation = input.TriggerPressed
-                        ? ActivationState.Active
-                        : ActivationState.Armed;
-                }
+                _triggerReleaseRequired = true;
+                _haptics.StopImmediately();
+                Transition(SessionState.Suspended, ProcessEventType.Suspended,
+                    decision.Reasons.ToString(), now);
             }
-            else if (_state == SessionState.Ready)
-            {
-                if (_emergencyStopLatched)
-                    _activation = ActivationState.ResetRequired;
-                else
-                    _activation = reasons == BlockReason.None
-                        ? ActivationState.ReadyDisarmed
-                        : ActivationState.Inhibited;
-            }
-            else if (_state == SessionState.Suspended)
-            {
-                _activation = _emergencyStopLatched
-                    ? ActivationState.ResetRequired
-                    : ActivationState.Inhibited;
-            }
-
-            _reasons = reasons;
         }
 
-        private BlockReason ComputeBlockReasons(
+        // Helpers collect evidence; only ActivationReducer grants permission.
+        private InterlockInputs BuildInterlockInputs(
+            TrainingInput input, RegistrationInput registration, double now,
+            bool armed, bool includeEmergencyStop = true, bool includeTriggerRelease = true)
+        {
+            SafetyInput safety = _tickSafety ??= _attempt != null && input.Available &&
+                registration.Available && registration.Valid
+                ? _safety.Evaluate(input, registration, _attempt) : default;
+            BlockReason reasons = ComputeBaseReasons(input, registration, now,
+                includeEmergencyStop, includeTriggerRelease);
+            if (!safety.Available) reasons |= BlockReason.SafetyUnknown;
+            else
+            {
+                reasons |= safety.Reasons;
+                if (!safety.Allowed) reasons |= BlockReason.SafetyRejected;
+            }
+            return new InterlockInputs(
+                _attempt != null && (_state == SessionState.Ready || _state == SessionState.Running || _state == SessionState.Suspended),
+                registration.Available && registration.Valid,
+                safety.Available && safety.AssemblyConfirmed, safety.Available && safety.BindingMatches,
+                input.HeadValid, input.ToolValid, !input.SystemInvalid, _recorder.Available,
+                safety.MenuOpen, input.TriggerPressed,
+                !includeTriggerRelease || !_triggerReleaseRequired, armed,
+                safety.FaultLatched, _nozzle, _clamp,
+                _attempt?.Process.Profile.Mode ?? ProcessMode.Fusion,
+                safety.Available ? safety.Contact : default,
+                safety.Available ? safety.Risk : RiskState.Unknown, reasons, _state == SessionState.Suspended);
+        }
+
+        private BlockReason ComputeBaseReasons(
             TrainingInput input,
             RegistrationInput registration,
             double now,
@@ -476,30 +471,6 @@ namespace WeldingTrainer.Application
 
             if (includeTriggerRelease && _triggerReleaseRequired)
                 reasons |= BlockReason.TriggerReleaseRequired;
-
-            if (_attempt == null ||
-                !input.Available ||
-                !registration.Available ||
-                !registration.Valid)
-            {
-                reasons |= BlockReason.SafetyUnknown;
-            }
-            else
-            {
-                SafetyInput safety = _safety.Evaluate(input, registration, _attempt);
-
-                if (!safety.Available)
-                {
-                    reasons |= BlockReason.SafetyUnknown;
-                }
-                else if (!safety.Allowed)
-                {
-                    reasons |= BlockReason.SafetyRejected | safety.Reasons;
-                }
-
-                if (safety.FaultLatched)
-                    reasons |= BlockReason.FaultLatched;
-            }
 
             return reasons;
         }
@@ -603,18 +574,16 @@ namespace WeldingTrainer.Application
 
             ApplyRegistrationReplacementSideEffects(registration, now);
 
-            BlockReason prerequisites = ComputeBlockReasons(
-                input,
-                registration,
-                now,
-                includeEmergencyStop: false,
-                includeTriggerRelease: false);
+            ActivationDecision reset = ActivationReducer.Evaluate(BuildInterlockInputs(
+                input, registration, now, false,
+                includeEmergencyStop: false, includeTriggerRelease: false));
+            BlockReason prerequisites = reset.Reasons;
 
             if (prerequisites != BlockReason.None)
                 return;
 
             _emergencyStopLatched = false;
-            _activation = ActivationState.ReadyDisarmed;
+            _activation = reset.State;
             Emit(ProcessEventType.EmergencyReset, "reset", commandTime);
         }
 
@@ -804,24 +773,11 @@ namespace WeldingTrainer.Application
 
             ApplyRegistrationReplacementSideEffects(registration, now);
 
-            BlockReason reasons = ComputeBlockReasons(
-                input,
-                registration,
-                now,
-                includeEmergencyStop: true,
-                includeTriggerRelease: true);
-
-            _reasons = reasons;
-
-            if (reasons != BlockReason.None)
-            {
-                _activation = _emergencyStopLatched
-                    ? ActivationState.ResetRequired
-                    : ActivationState.Inhibited;
-                return;
-            }
-
-            _activation = ActivationState.Armed;
+            ActivationDecision decision = ActivationReducer.Evaluate(
+                BuildInterlockInputs(input, registration, now, true));
+            _reasons = decision.Reasons;
+            _activation = decision.State;
+            if (!decision.Permission) return;
 
             Transition(
                 SessionState.Running,

@@ -90,41 +90,94 @@ def check_training_test_isolation(errors: list[str]) -> None:
     build_path = ROOT / "unity/ProjectSettings/EditorBuildSettings.asset"
     build = build_path.read_text(encoding="utf-8")
 
-    if "TrainingTest/FakeTraining.unity" in build:
-        errors.append("FakeTraining scene must not be included in release Build Settings")
-
-    fake_scene = ROOT / "unity/Assets/Trainer/Scenes/TrainingTest/FakeTraining.unity"
-    if fake_scene.is_file() and fake_scene.read_text(encoding="utf-8").count(
-        "WeldingTrainer.TrainingTest.FakeTrainingComposition"
-    ) != 1:
-        errors.append("FakeTraining scene must contain exactly one fake composition")
-
+    fake_scene = (
+        ROOT
+        / "unity/Assets/Trainer/Scenes/TrainingTest/FakeTraining.unity"
+    )
+    fake_composition = (
+        ROOT
+        / "unity/Assets/Trainer/Scenes/TrainingTest/FakeTrainingComposition.cs"
+    )
     fake_asmdef = (
         ROOT
         / "unity/Assets/Trainer/Scenes/TrainingTest/WeldingTrainer.TrainingTest.asmdef"
     )
+    bootstrap = ROOT / "unity/Assets/Trainer/Scenes/Bootstrap.unity"
+
+    # The synthetic fake scene must never be part of a production player build.
+    if "TrainingTest/FakeTraining.unity" in build:
+        errors.append(
+            "FakeTraining scene must not be included in release Build Settings"
+        )
+
+    # The fake scene must contain exactly one composition root.
+    if fake_scene.is_file():
+        fake_scene_text = fake_scene.read_text(encoding="utf-8")
+
+        if fake_scene_text.count(
+            "WeldingTrainer.TrainingTest.FakeTrainingComposition"
+        ) != 1:
+            errors.append(
+                "FakeTraining scene must contain exactly one fake composition"
+            )
+
+    # The assembly must be available in Editor Play Mode so that Unity can
+    # deserialize FakeTrainingComposition as a real MonoBehaviour.
+    #
+    # Player exclusion is enforced at source level with UNITY_EDITOR below,
+    # rather than with includePlatforms=["Editor"], because an Editor-only
+    # asmdef prevents the scene component from being resolved correctly.
     if fake_asmdef.is_file():
         try:
             data = json.loads(fake_asmdef.read_text(encoding="utf-8"))
         except json.JSONDecodeError as exc:
             errors.append(f"TrainingTest asmdef is invalid JSON: {exc}")
         else:
-            include_platforms = data.get("includePlatforms")
-            if include_platforms != ["Editor"]:
+            include_platforms = data.get("includePlatforms", [])
+
+            if include_platforms:
                 errors.append(
-                    "WeldingTrainer.TrainingTest must be Editor-only so synthetic-valid "
-                    "providers cannot compile into the Quest player"
+                    "WeldingTrainer.TrainingTest must not restrict includePlatforms; "
+                    "FakeTrainingComposition is excluded from player builds with "
+                    "UNITY_EDITOR instead"
                 )
+
             if data.get("autoReferenced") is not False:
                 errors.append(
                     "WeldingTrainer.TrainingTest must keep autoReferenced=false"
                 )
 
-    bootstrap = ROOT / "unity/Assets/Trainer/Scenes/Bootstrap.unity"
+    # The fake MonoBehaviour must be compiled only in the Unity Editor.
+    # Require a whole-file guard, not merely an arbitrary UNITY_EDITOR token.
+    if fake_composition.is_file():
+        source = fake_composition.read_text(encoding="utf-8")
+
+        stripped = source.strip()
+
+        if not stripped.startswith("#if UNITY_EDITOR"):
+            errors.append(
+                "FakeTrainingComposition.cs must start with #if UNITY_EDITOR "
+                "so synthetic-valid providers cannot compile into the Quest player"
+            )
+
+        if not stripped.endswith("#endif"):
+            errors.append(
+                "FakeTrainingComposition.cs must end with #endif for its "
+                "UNITY_EDITOR whole-file guard"
+            )
+    else:
+        errors.append(
+            "FakeTrainingComposition.cs is missing"
+        )
+
+    # Production Bootstrap must never reference the synthetic fake composition.
     if bootstrap.is_file():
         bootstrap_text = bootstrap.read_text(encoding="utf-8")
+
         if "WeldingTrainer.TrainingTest.FakeTrainingComposition" in bootstrap_text:
-            errors.append("Production Bootstrap must not contain FakeTrainingComposition")
+            errors.append(
+                "Production Bootstrap must not contain FakeTrainingComposition"
+            )
 
 
 def main() -> int:

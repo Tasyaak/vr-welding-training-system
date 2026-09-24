@@ -5,9 +5,7 @@
     "WeldingTrainer.Domain",
     "WeldingTrainer.Application"
   ],
-  "includePlatforms": [
-    "Editor"
-  ],
+  "includePlatforms": [],
   "autoReferenced": false,
   "noEngineReferences": false
 }
