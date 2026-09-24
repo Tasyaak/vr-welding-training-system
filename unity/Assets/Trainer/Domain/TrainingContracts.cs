@@ -73,17 +73,7 @@ namespace WeldingTrainer.Domain
         InputUnavailable = 32768,
         SystemInvalid = 65536,
         RegistrationChanged = 131072,
-        FixtureMismatch = 262144,
-        AssemblyUnconfirmed = 1UL << 19,
-        BindingMismatch = 1UL << 20,
-        ContactInvalid = 1UL << 21,
-        OutsideFiniteSurface = 1UL << 22,
-        WrongApproach = 1UL << 23,
-        AmbiguousSurface = 1UL << 24,
-        ReflectionUnknown = 1UL << 25,
-        ReflectionUnsafe = 1UL << 26,
-        ProcessPrerequisiteMissing = 1UL << 27,
-        MenuOpen = 1UL << 28
+        FixtureMismatch = 262144
     }
 
     public readonly struct Vec3
@@ -287,7 +277,6 @@ namespace WeldingTrainer.Domain
         public ClampState Clamp { get; }
         public BlockReason Reasons { get; }
         public bool Requested { get; }
-        public BlockReason PrimaryReason => ActivationDecision.Primary(Reasons);
 
         public bool Permission =>
             Activation == ActivationState.Armed ||
