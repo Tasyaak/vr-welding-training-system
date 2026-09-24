@@ -7,6 +7,7 @@ import re
 import subprocess
 from pathlib import Path
 from spatial_repository_checks import check_spatial_content, run_spatial_tests
+from registration_repository_checks import check_registration, run_registration_tests
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -152,6 +153,8 @@ def main() -> int:
     check_training_test_isolation(errors)
     check_spatial_content(errors)
     run_spatial_tests(errors)
+    check_registration(errors)
+    run_registration_tests(errors)
 
     scene_path = ROOT / "unity/Assets/Trainer/Scenes/Bootstrap.unity"
     if scene_path.is_file():

@@ -18,12 +18,17 @@ PrototypeDemo. It is a demo composition; the presence of MRUK does not prove
 that production QR registration is enabled or implemented.
 The #46 implementation changes no production scene/package/input asset.
 
-#49 must inspect current Scene/Anchor settings and spatial permission, enable
-MRUK QR tracker configuration and check actual QRCodeTrackingSupported state.
+#49 provides a separate [registration preview and workflow](qr-registration.md).
+It inspects Scene/Anchor settings and permission, requests MRUK QR tracking and
+checks actual QRCodeTrackingSupported and applied configuration.
 USE_SCENE and USE_ANCHOR_API are present in the current Android manifest.
 Follow the pinned package APIs and [Meta QR setup](https://developers.meta.com/horizon/documentation/unity/unity-mr-utility-kit-qrcode-detection/);
 do not add raw-camera access solely to decode QR through MRUK.
 Vendor sample left-controller controls are not part of the production UI.
+The shipped scene deliberately has no qualified device/print profile. #66 must
+select one print and qualify installed plane and runtime conventions; A cannot
+override these blockers. Its B button cancels a diagnostic session only; #58 owns
+the production B/E-stop binding.
 
 ## Assets and independent test scenes
 

@@ -37,8 +37,9 @@ registration, process state or persistence. Group A content now lives in
 QR recess, versioned assembly catalog and validation. The supplied content is
 unqualified for scoring: two known QR print candidates await selection and
 physical installation qualification under #66. The owner-selected directed
-T-joint and finite pre/post cleaning bands are now authored. Runtime registration and training integration remain
-separate issues. Existing unmerged PRs are not prerequisites.
+T-joint and finite pre/post cleaning bands are now authored. #49 supplies an
+independent [runtime QR registration workflow](docs/qr-registration.md), Meta
+adapters and standalone preview. Final training composition remains #58.
 
 ## Parallel delivery
 
@@ -60,8 +61,8 @@ and OpenXR `1.16.1`. Open the existing `unity` directory in Unity Hub,
 then `Assets/Trainer/Scenes/Bootstrap.unity`. Keep package versions pinned.
 
 Run `python tests/repository_checks.py`; follow [setup](docs/setup.md)
-for Unity and standalone Quest validation. Documentation changes do not enable
-QR tracking in the scene. The actual configuration is part of #49.
+for Unity and standalone Quest validation. Use the separate RegistrationPreview
+scene for #49; Bootstrap remains unchanged pending #58.
 
 ## Architecture and evidence
 

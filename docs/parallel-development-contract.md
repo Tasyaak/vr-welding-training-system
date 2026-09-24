@@ -111,6 +111,12 @@ requiring Group B to reference Group A assemblies now.
 
 ## Release distinction
 
+[#49's schema-1 snapshot](qr-registration.md#consumption-and-evidence) contains
+session/registration/origin identity, full immutable binding with selected print
+metadata, named RH poses and evidence. Read freshly and check `IsUsableAt`; retained
+snapshots are history. #58 maps this boundary, preserves the Unity/RH conversion
+for all platform poses, and starts a new attempt after re-registration.
+
 A and B can finish their own PRs using fakes and schema fixtures. The complete
 MVP cannot ship without both real adapter qualification and the #58 safety,
 recording and one-controller device tests. Independence must never become a

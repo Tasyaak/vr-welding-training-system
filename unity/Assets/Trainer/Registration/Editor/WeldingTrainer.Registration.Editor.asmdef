@@ -1,0 +1,6 @@
+{
+  "name": "WeldingTrainer.Registration.Editor",
+  "references": ["WeldingTrainer.Registration.Preview", "WeldingTrainer.Registration.Meta", "WeldingTrainer.Content.Spatial.Unity", "Oculus.VR", "Oculus.VR.Editor", "meta.xr.mrutilitykit"],
+  "includePlatforms": ["Editor"],
+  "autoReferenced": false
+}
