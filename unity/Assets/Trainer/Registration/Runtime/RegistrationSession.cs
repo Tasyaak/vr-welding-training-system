@@ -315,6 +315,20 @@ namespace WeldingTrainer.Registration
             }
 
             window.RemoveAll(x => now - x.ReceivedAt > quality.Window);
+            // Bound storage by time, not render rate. Still reject outliers on EVERY fresh update.
+            if (window.Count > 0)
+            {
+                var baseline = RegistrationMath.Mean(window);
+                if (Conflict(baseline, observation.WorldFromMarker.Value, quality.TranslationScatter, quality.AngularScatter))
+                {
+                    Reject(RegistrationReason.UnstablePose);
+                    return;
+                }
+
+                if (observation.ReceivedAt - window[window.Count - 1].ReceivedAt < quality.MinimumSampleInterval)
+                    return;
+            }
+
             if (window.Count >= quality.MaximumObservations)
                 window.RemoveAt(0);
             window.Add(observation);
@@ -455,7 +469,7 @@ namespace WeldingTrainer.Registration
         private void Monitor(QrObservation observation)
         {
             // Invalid/stale diagnostic QR cannot move the frozen registration or masquerade as new evidence.
-            if (observation == null || !Fresh(observation.ReceivedAt, quality.QrMaxAge))
+            if (observation == null || !Fresh(observation.ReceivedAt, quality.QrMaxAge) || (observation.SourceCapturedAt.HasValue && (!Fresh(observation.SourceCapturedAt.Value, quality.QrMaxAge) || observation.SourceCapturedAt.Value > observation.ReceivedAt)))
                 return;
             if (!QrPayload.TryParse(observation.CopyPayload(), out var id) || id != binding.PartId)
             {
@@ -478,6 +492,8 @@ namespace WeldingTrainer.Registration
                 return;
             }
 
+            if (check != RegistrationReason.None)
+                return;
             var expected = fixture.Value * binding.FixtureFromMarker;
             if (Conflict(expected, observation.WorldFromMarker.Value, quality.ConflictTranslation, quality.ConflictAngle))
                 Lose(RegistrationReason.QrConflict);

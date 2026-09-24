@@ -96,6 +96,7 @@ namespace WeldingTrainer.Registration
     {
         public int MinimumObservations => 4;
         public int MaximumObservations => 32;
+        public double MinimumSampleInterval => .1;
         public double MinimumSpan => 2.0;
         public double Window => 6.0;
         public double QrMaxAge => 1.5;

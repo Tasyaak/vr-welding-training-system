@@ -148,6 +148,10 @@ Receive time is a host monotonic timestamp, **not** a camera exposure timestamp.
 | Acquisition / preview / anchoring timeout | 45 / 30 / 15 s |
 | Later material pose conflict | > 15 mm or > 8° from anchored placement |
 
+The bounded stability window retains at most one sample per 100 ms so high-rate
+SDK updates cannot evict the required two-second span. Every fresh update still
+passes geometry and outlier gates before downsampling.
+
 These conservative engineering defaults are **not measured physical accuracy or
 an approved welding error budget**. Their identity is in every evidence snapshot;
 changing them requires a policy version and regression tests. Quaternion averaging
@@ -249,7 +253,7 @@ WeldingTrainer.Registration.Editor.RegistrationPreviewBuilder.BuildAndroid -quit
 installed .NET SDK ≥ 8, no NuGet dependencies, and checks Group A references,
 metadata, preview separation and prohibited persistence calls. Unity EditMode
 `WeldingTrainer.Registration.Tests` repeats the shared cases with Unity JSON and
-checks the SDK transport/transform-notification assumptions.
+checks SDK transport/update-witness and coordinate/presentation assumptions.
 
 Device acceptance remains explicit: grant/deny permission; unsupported tuple;
 valid/invalid/duplicate codes; 4 rotated views; unstable/stale/dimension errors;

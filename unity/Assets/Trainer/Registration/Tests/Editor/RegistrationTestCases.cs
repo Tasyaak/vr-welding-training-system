@@ -754,6 +754,42 @@ namespace WeldingTrainer.Registration.Tests
                     Near(frozen.Position, h.Session.LastSnapshot.WorldFromWorkpiece.Value.Position);
                 }
             });
+            tests.Add("High frequency observations can fill the time window", () =>
+            {
+                using (var h = new Harness(Catalog()))
+                {
+                    for (int i = 0; i < 230; i++)
+                    {
+                        h.Clock.Now += .01;
+                        h.Sample();
+                    }
+
+                    Equal(RegistrationState.Preview, h.Session.LastSnapshot.State);
+                    if (h.Session.LastSnapshot.ObservationCount > 32)
+                        throw new Exception("Unbounded window");
+                }
+            });
+            tests.Add("Outlier between retained samples resets stability", () =>
+            {
+                using (var h = new Harness(Catalog()))
+                {
+                    h.Sample();
+                    h.Clock.Now += .01;
+                    h.Sample(h.Observation(pose: RegistrationMath.Pose("World", "Marker", h.Marker.Position + new Vec3(.01, 0, 0), h.Marker.Rotation)));
+                    Equal(RegistrationReason.UnstablePose, h.Session.LastSnapshot.Reason);
+                    Equal(0, h.Session.LastSnapshot.ObservationCount);
+                }
+            });
+            tests.Add("Stale source capture cannot invalidate a localized anchor", () =>
+            {
+                using (var h = new Harness(Catalog()))
+                {
+                    h.Register();
+                    var o = h.Observation("LW1:OTHER");
+                    h.Sample(new QrObservation(o.CopyPayload(), o.TrackableId, o.Sequence, o.OriginGeneration, o.ReceivedAt, o.WorldFromMarker, o.WidthMetres, o.HeightMetres, o.DimensionConvention, o.ObserverPosition, h.Clock.Now - 10));
+                    Equal(RegistrationState.Registered, h.Session.LastSnapshot.State);
+                }
+            });
             tests.Add("Stale conflicting QR is ignored after registration", () =>
             {
                 using (var h = new Harness(Catalog()))
