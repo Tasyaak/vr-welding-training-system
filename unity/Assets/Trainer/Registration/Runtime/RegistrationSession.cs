@@ -94,7 +94,7 @@ namespace WeldingTrainer.Registration
         public void Confirm(bool correctPart, bool secured, bool plausibleOverlay)
         {
             Tick();
-            if (state != RegistrationState.Preview)
+            if (state != RegistrationState.Preview || reason == RegistrationReason.AwaitingTrackedQr)
                 return;
             if (!correctPart || !secured || !plausibleOverlay)
             {
@@ -245,14 +245,22 @@ namespace WeldingTrainer.Registration
                 if (state == RegistrationState.Lost)
                     return;
                 // Zero observations is normal after acceptance. Only positive, fresh conflicting evidence invalidates.
-                if (frame.Observations.Count > 1)
+                QrObservation freshDiagnostic = null;
+                foreach (var diagnostic in frame.Observations)
                 {
-                    Lose(RegistrationReason.AmbiguousQr);
-                    return;
+                    if (!FreshObservation(diagnostic))
+                        continue;
+                    if (freshDiagnostic != null)
+                    {
+                        Lose(RegistrationReason.AmbiguousQr);
+                        return;
+                    }
+
+                    freshDiagnostic = diagnostic;
                 }
 
-                if (frame.Observations.Count == 1)
-                    Monitor(frame.Observations[0]);
+                if (freshDiagnostic != null)
+                    Monitor(freshDiagnostic);
                 return;
             }
 
@@ -265,6 +273,8 @@ namespace WeldingTrainer.Registration
 
             if (frame.Observations.Count != 1)
             {
+                if (frame.Observations.Count == 0 && PauseForSameTrackable(frame))
+                    return;
                 Reject(frame.Observations.Count == 0 ? RegistrationReason.AwaitingQr : RegistrationReason.AmbiguousQr);
                 return;
             }
@@ -289,6 +299,7 @@ namespace WeldingTrainer.Registration
                 binding = null;
                 trackableId = null;
                 lastSequence = -1;
+                lastQr = null;
                 return;
             }
 
@@ -311,6 +322,8 @@ namespace WeldingTrainer.Registration
                 var expected = fixture.Value * binding.FixtureFromMarker;
                 if (Conflict(expected, observation.WorldFromMarker.Value, quality.TranslationScatter, quality.AngularScatter))
                     Reject(RegistrationReason.UnstablePose);
+                else
+                    reason = RegistrationReason.AwaitingConfirmation;
                 return;
             }
 
@@ -357,6 +370,27 @@ namespace WeldingTrainer.Registration
             deadline = now + quality.PreviewTimeout;
         }
 
+        private bool PauseForSameTrackable(TrackerFrame frame)
+        {
+            if (binding == null || !lastQr.HasValue)
+                return false;
+            foreach (var trackable in frame.Trackables)
+            {
+                if (trackable.TrackableId != trackableId || (trackable.IsTracked && !trackable.AwaitingTrackedUpdate))
+                    continue;
+                // No new grace period: the original observation's deadline keeps running.
+                if (!Fresh(lastQr.Value, quality.QrMaxAge))
+                    Reject(RegistrationReason.StaleObservation);
+                else
+                    reason = RegistrationReason.AwaitingTrackedQr;
+                // Retain candidate/history only; Confirm is blocked and IsValid remains false.
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool FreshObservation(QrObservation observation) => observation != null && Fresh(observation.ReceivedAt, quality.QrMaxAge) && (!observation.SourceCapturedAt.HasValue || (Fresh(observation.SourceCapturedAt.Value, quality.QrMaxAge) && observation.SourceCapturedAt.Value <= observation.ReceivedAt));
         private RegistrationReason PlatformGate(PlatformStatus p)
         {
             if (!p.Supported)
@@ -469,7 +503,7 @@ namespace WeldingTrainer.Registration
         private void Monitor(QrObservation observation)
         {
             // Invalid/stale diagnostic QR cannot move the frozen registration or masquerade as new evidence.
-            if (observation == null || !Fresh(observation.ReceivedAt, quality.QrMaxAge) || (observation.SourceCapturedAt.HasValue && (!Fresh(observation.SourceCapturedAt.Value, quality.QrMaxAge) || observation.SourceCapturedAt.Value > observation.ReceivedAt)))
+            if (!FreshObservation(observation))
                 return;
             if (!QrPayload.TryParse(observation.CopyPayload(), out var id) || id != binding.PartId)
             {

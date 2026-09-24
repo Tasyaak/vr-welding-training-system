@@ -199,7 +199,89 @@ namespace WeldingTrainer.Registration.Tests
             boundary.Clear();
             Assert.IsTrue(witness.Consume(boundary));
             Assert.IsTrue(witness.Consume(new List<Vector2>()));
+            Assert.IsTrue(witness.Consume(null));
             Assert.IsFalse(witness.Consume(null));
+        }
+
+        [Test]
+        public void TrackableCacheRetainsLifetimeButNeverPromotesUntrackedOrPolledData()
+        {
+            var cache = new MrukQrTrackableCache();
+            var boundary = new List<Vector2>
+            {
+                Vector2.zero,
+                Vector2.one
+            };
+            double now = 10;
+            long captures = 0;
+            System.Func<string, QrObservation> capture = id => new QrObservation(Encoding.UTF8.GetBytes("LW1:PART-001"), id, ++captures, 1, now, null, .053, .053, "ExcludesQuietZone", null);
+            cache.Add(7, boundary, true); // A real SDK Added event, not enumeration.
+            var first = cache.Poll(7, true, boundary, capture);
+            var identity = first.TrackableId;
+            now += .2;
+            Assert.IsNull(cache.Poll(7, false, boundary, capture));
+            Assert.AreEqual(identity, cache.Snapshot()[0].TrackableId);
+            Assert.AreSame(first, cache.Snapshot()[0].LastObservation);
+            Assert.IsNull(cache.Poll(7, true, boundary, capture)); // Tracked flag alone is not a pose update.
+            boundary.Clear();
+            Assert.IsNull(cache.Poll(7, false, boundary, capture)); // Consume the untracked mutation.
+            Assert.IsNull(cache.Poll(7, true, boundary, capture));
+            Assert.AreEqual(1, captures);
+            boundary.Add(Vector2.one);
+            var resumed = cache.Poll(7, true, boundary, capture);
+            Assert.AreEqual(identity, resumed.TrackableId);
+            Assert.AreEqual(2, captures);
+            Assert.AreEqual(now, resumed.ReceivedAt);
+            now += 20;
+            for (int i = 0; i < 200; i++)
+                Assert.AreSame(resumed, cache.Poll(7, true, boundary, capture));
+            Assert.AreEqual(2, captures);
+            Assert.AreEqual(10.2, resumed.ReceivedAt);
+            Assert.Greater(now - resumed.ReceivedAt, new RegistrationQuality().QrMaxAge);
+        }
+
+        [Test]
+        public void EnumerationRemovalAndOriginResetCannotManufactureFreshnessOrReuseIdentity()
+        {
+            var cache = new MrukQrTrackableCache();
+            var boundary = new List<Vector2>();
+            long captures = 0;
+            System.Func<string, QrObservation> capture = id => new QrObservation(null, id, ++captures, 1, 10, null, 0, 0, null, null);
+            cache.Add(7, boundary, false);
+            Assert.IsNull(cache.Poll(7, true, boundary, capture));
+            boundary.Clear();
+            var original = cache.Poll(7, true, boundary, capture);
+            cache.Poll(7, false, boundary, capture);
+            cache.Reconcile(new HashSet<int> { 7 });
+            Assert.AreEqual(original.TrackableId, cache.Snapshot()[0].TrackableId);
+            cache.Remove(7);
+            cache.Add(7, boundary, true);
+            var replacement = cache.Poll(7, true, boundary, capture);
+            Assert.AreNotEqual(original.TrackableId, replacement.TrackableId);
+            cache.Clear(); // origin change/start/stop: enumerate existing objects as baseline only
+            Assert.IsNull(cache.Poll(7, true, boundary, capture));
+            Assert.AreNotEqual(replacement.TrackableId, cache.Snapshot()[0].TrackableId);
+            Assert.AreEqual(2, captures);
+            cache.Reconcile(new HashSet<int>());
+            Assert.Zero(cache.Snapshot().Count);
+        }
+
+        [Test]
+        public void PlaneRemovalReplacesEvidenceAndDiagnosticsCannotAffectCache()
+        {
+            var cache = new MrukQrTrackableCache(_ => throw new System.Exception("diagnostic listener failed"));
+            var boundary = new List<Vector2>();
+            long captures = 0;
+            System.Func<string, QrObservation> capture = id => new QrObservation(null, id, ++captures, 1, 10, null, 0, 0, null, null);
+            cache.Add(7, boundary, true);
+            cache.Poll(7, true, boundary, capture);
+            var invalid = cache.Poll(7, true, null, capture);
+            Assert.AreEqual(2, captures);
+            Assert.AreSame(invalid, cache.Poll(7, true, null, capture));
+            Assert.IsFalse(MetaQrTracker.IsFinitePlane(new Rect(0, 0, float.NegativeInfinity, float.NegativeInfinity)));
+            Assert.IsFalse(MetaQrTracker.IsFinitePlane(new Rect(float.NaN, 0, .053f, .053f)));
+            Assert.IsFalse(MetaQrTracker.IsFinitePlane(new Rect(0, 0, 0, .053f)));
+            Assert.IsTrue(MetaQrTracker.IsFinitePlane(new Rect(-.0265f, -.0265f, .053f, .053f)));
         }
 
         [Test]

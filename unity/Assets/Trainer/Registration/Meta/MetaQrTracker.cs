@@ -54,10 +54,9 @@ namespace WeldingTrainer.Registration.Meta
         private readonly string dimensionConvention, conventionEvidence;
         private readonly IMonotonicClock clock;
         private readonly List<MRUKTrackable> trackables = new List<MRUKTrackable>();
-        private readonly Dictionary<int, QrObservation> samples = new Dictionary<int, QrObservation>();
-        private readonly Dictionary<int, MrukPlaneUpdateWitness> updates = new Dictionary<int, MrukPlaneUpdateWitness>();
-        private readonly HashSet<int> visible = new HashSet<int>();
-        private readonly List<int> expired = new List<int>();
+        private readonly MrukQrTrackableCache cache;
+        private readonly Action<string> diagnostic;
+        private readonly HashSet<int> present = new HashSet<int>();
         private bool requested, disposed, permissionPending, denied;
         private long sequence, origin;
         private Vector3 trackingPosition;
@@ -67,11 +66,15 @@ namespace WeldingTrainer.Registration.Meta
         public string RuntimeTuple { get; }
         public TrackerFrame LastFrame { get; private set; }
 
-        public MetaQrTracker(MRUK mruk, OVRCameraRig rig, QrAdapterQualification qualification, IMonotonicClock clock)
+        public MetaQrTracker(MRUK mruk, OVRCameraRig rig, QrAdapterQualification qualification, IMonotonicClock clock, Action<string> diagnostic = null)
         {
             this.mruk = mruk ? mruk : throw new ArgumentNullException(nameof(mruk));
             this.rig = rig ? rig : throw new ArgumentNullException(nameof(rig));
             this.clock = clock;
+            this.diagnostic = diagnostic;
+            cache = new MrukQrTrackableCache(Trace);
+            mruk.SceneSettings.TrackableAdded.AddListener(OnTrackableAdded);
+            mruk.SceneSettings.TrackableRemoved.AddListener(OnTrackableRemoved);
             RuntimeTuple = SystemInfo.operatingSystem + " | " + SystemInfo.deviceModel + " | OVRPlugin " + OVRPlugin.version + " | Core/MRUK 205.0.0 | OpenXR 1.16.1 | RH-Sz/MRUK-Sx v1";
             qualified = qualification && qualification.IsQualified(RuntimeTuple);
             dimensionConvention = qualified ? qualification.dimensionConvention : "Unqualified";
@@ -97,7 +100,8 @@ namespace WeldingTrainer.Registration.Meta
         private void Discontinuity()
         {
             origin++;
-            samples.Clear();
+            SeedExisting();
+            Trace("origin-reset");
         }
 
         public void RequestScanning()
@@ -105,13 +109,9 @@ namespace WeldingTrainer.Registration.Meta
             if (disposed)
                 throw new ObjectDisposedException(nameof(MetaQrTracker));
             requested = true;
+            Trace("scan-start");
             denied = false;
-            samples.Clear();
-            updates.Clear();
-            mruk.GetTrackables(trackables);
-            foreach (var existing in trackables)
-                if (existing)
-                    updates[existing.GetInstanceID()] = new MrukPlaneUpdateWitness(existing.PlaneBoundary2D);
+            SeedExisting();
 #if UNITY_ANDROID && !UNITY_EDITOR
             if(!Permission.HasUserAuthorizedPermission(OVRPermissionsRequester.ScenePermission) && !permissionPending)
             {
@@ -137,9 +137,9 @@ namespace WeldingTrainer.Registration.Meta
         public void StopScanning()
         {
             requested = false;
+            Trace("scan-stop");
             ApplyRequest();
-            samples.Clear();
-            updates.Clear();
+            cache.Clear();
             LastFrame = null;
         }
 
@@ -164,63 +164,87 @@ namespace WeldingTrainer.Registration.Meta
             bool tracking = OVRPlugin.initialized && OVRManager.isHmdPresent && OVRPlugin.GetNodePositionTracked(OVRPlugin.Node.Head) && OVRPlugin.GetNodeOrientationTracked(OVRPlugin.Node.Head);
             var status = new PlatformStatus(mruk.QRCodeTrackingSupported, permission ? PermissionState.Granted : denied ? PermissionState.Denied : permissionPending ? PermissionState.Pending : PermissionState.Unknown, manifestValid && mruk.isActiveAndEnabled && !mruk.EnableWorldLock && rig.trackingSpace.lossyScale == Vector3.one, mruk.SceneSettings.TrackerConfiguration.QRCodeTrackingEnabled, mruk.TrackerConfiguration.QRCodeTrackingEnabled, qualified, tracking, origin, clock.Now, RuntimeTuple, conventionEvidence);
             var observations = new List<QrObservation>();
-            visible.Clear();
+            present.Clear();
             mruk.GetTrackables(trackables);
-            foreach (var t in trackables)
-            {
-                if (!t || t.TrackableType != OVRAnchor.TrackableType.QRCode || !t.IsTracked)
-                    continue;
-                int id = t.GetInstanceID();
-                visible.Add(id);
-                bool sdkUpdated;
-                if (!updates.TryGetValue(id, out var witness))
+            if (requested)
+                foreach (var t in trackables)
                 {
-                    updates[id] = new MrukPlaneUpdateWitness(t.PlaneBoundary2D);
-                    sdkUpdated = t.PlaneBoundary2D != null;
-                }
-                else
-                    sdkUpdated = witness.Consume(t.PlaneBoundary2D);
-                if (sdkUpdated || !samples.ContainsKey(id))
-                {
-                    // Never parent, smooth or otherwise write to SDK-owned roots or boundaries.
-                    RigidPose? pose = null;
-                    double width = 0, height = 0;
-                    if (sdkUpdated && t.PlaneRect.HasValue && t.transform.parent == null)
-                    {
-                        var rect = t.PlaneRect.Value;
-                        width = rect.width;
-                        height = rect.height;
-                        try
-                        {
-                            pose = RegistrationMath.CenterMrukPlane(UnityRegistrationPose.Read(t.transform, "MrukPlane"), rect.center.x, rect.center.y);
-                        }
-                        catch (ArgumentException)
-                        {
-                        }
-                        catch (SpatialContentException)
-                        {
-                        }
-                    }
-
-                    var eye = rig.centerEyeAnchor.position;
-                    samples[id] = new QrObservation(TransportPayload(t.MarkerPayloadBytes, t.MarkerPayloadString != null), id.ToString(), ++sequence, origin, clock.Now, pose, width, height, dimensionConvention, UnityRegistrationPose.ToDomain(eye));
+                    if (!t || t.TrackableType != OVRAnchor.TrackableType.QRCode)
+                        continue;
+                    int id = t.GetInstanceID();
+                    present.Add(id); // Includes temporarily untracked objects, as MRUK does.
+                    var observation = cache.Poll(id, t.IsTracked, t.PlaneBoundary2D, identity => Capture(t, identity));
+                    if (observation != null)
+                        observations.Add(observation);
                 }
 
-                observations.Add(samples[id]);
-            }
-
-            expired.Clear();
-            foreach (var id in samples.Keys)
-                if (!visible.Contains(id))
-                    expired.Add(id);
-            foreach (var id in expired)
-            {
-                samples.Remove(id);
-                updates.Remove(id);
-            }
-
-            LastFrame = new TrackerFrame(status, observations);
+            cache.Reconcile(present);
+            LastFrame = new TrackerFrame(status, observations, cache.Snapshot());
             return LastFrame;
+        }
+
+        private void SeedExisting()
+        {
+            cache.Clear();
+            mruk.GetTrackables(trackables);
+            foreach (var existing in trackables)
+                if (existing && existing.TrackableType == OVRAnchor.TrackableType.QRCode)
+                    cache.Add(existing.GetInstanceID(), existing.PlaneBoundary2D, false);
+        }
+
+        private void OnTrackableAdded(MRUKTrackable trackable)
+        {
+            if (!trackable || trackable.TrackableType != OVRAnchor.TrackableType.QRCode)
+                return;
+            Trace($"event=TrackableAdded instance={trackable.GetInstanceID()}");
+            if (requested && !disposed)
+                cache.Add(trackable.GetInstanceID(), trackable.PlaneBoundary2D, true);
+        }
+
+        private void OnTrackableRemoved(MRUKTrackable trackable)
+        {
+            if (!trackable || trackable.TrackableType != OVRAnchor.TrackableType.QRCode)
+                return;
+            Trace($"event=TrackableRemoved instance={trackable.GetInstanceID()}");
+            cache.Remove(trackable.GetInstanceID());
+        }
+
+        private void Trace(string message)
+        {
+            try
+            {
+                diagnostic?.Invoke($"QR t={clock.Now:F6} frame={Time.frameCount} origin={origin} requested={requested} {message}");
+            }
+            catch
+            { /* Logging is diagnostic only. */
+            }
+        }
+
+        public static bool IsFinitePlane(Rect rect) => RegistrationMath.Finite(rect.center.x) && RegistrationMath.Finite(rect.center.y) && RegistrationMath.Finite(rect.width) && RegistrationMath.Finite(rect.height) && rect.width > 0 && rect.height > 0;
+        private QrObservation Capture(MRUKTrackable trackable, string identity)
+        {
+            RigidPose? pose = null;
+            double width = 0, height = 0;
+            if (trackable.PlaneRect.HasValue)
+            {
+                var rect = trackable.PlaneRect.Value;
+                width = rect.width;
+                height = rect.height;
+                if (IsFinitePlane(rect) && trackable.transform.parent == null)
+                    try
+                    {
+                        pose = RegistrationMath.CenterMrukPlane(UnityRegistrationPose.Read(trackable.transform, "MrukPlane"), rect.center.x, rect.center.y);
+                    }
+                    catch (ArgumentException)
+                    {
+                    }
+                    catch (SpatialContentException)
+                    {
+                    }
+            }
+
+            // Even an invalid SDK update replaces old evidence; never hide malformed bounds behind a good pose.
+            return new QrObservation(TransportPayload(trackable.MarkerPayloadBytes, trackable.MarkerPayloadString != null), identity, ++sequence, origin, clock.Now, pose, width, height, dimensionConvention, UnityRegistrationPose.ToDomain(rig.centerEyeAnchor.position));
         }
 
         // MRUK's StringQRCode transport includes one trailing NUL. Binary payloads are unmodified.
@@ -264,6 +288,12 @@ namespace WeldingTrainer.Registration.Meta
                 return;
             StopScanning();
             disposed = true;
+            if (mruk)
+            {
+                mruk.SceneSettings.TrackableAdded.RemoveListener(OnTrackableAdded);
+                mruk.SceneSettings.TrackableRemoved.RemoveListener(OnTrackableRemoved);
+            }
+
             OVRManager.TrackingLost -= Discontinuity;
             OVRManager.TrackingOriginChangePending -= OriginChanging;
             if (display != null)

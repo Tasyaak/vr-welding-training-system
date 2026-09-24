@@ -50,7 +50,8 @@ namespace WeldingTrainer.Registration
         MarkerMoved,
         SessionEnded,
         ClockInvalid,
-        PlatformFailure
+        PlatformFailure,
+        AwaitingTrackedQr
     }
 
     public enum AnchorStatus
@@ -162,15 +163,35 @@ namespace WeldingTrainer.Registration
         }
     }
 
+    // SDK object lifetime and current tracking are independent of the last captured pose.
+    // LastObservation is diagnostic history, never promoted to fresh evidence by this status.
+    public sealed class QrTrackableStatus
+    {
+        public string TrackableId { get; }
+        public bool IsTracked { get; }
+        public bool AwaitingTrackedUpdate { get; }
+        public QrObservation LastObservation { get; }
+
+        public QrTrackableStatus(string id, bool tracked, bool awaitingUpdate, QrObservation lastObservation)
+        {
+            TrackableId = id;
+            IsTracked = tracked;
+            AwaitingTrackedUpdate = awaitingUpdate;
+            LastObservation = lastObservation;
+        }
+    }
+
     public sealed class TrackerFrame
     {
         public PlatformStatus Platform { get; }
         public IReadOnlyList<QrObservation> Observations { get; }
+        public IReadOnlyList<QrTrackableStatus> Trackables { get; }
 
-        public TrackerFrame(PlatformStatus platform, IEnumerable<QrObservation> observations)
+        public TrackerFrame(PlatformStatus platform, IEnumerable<QrObservation> observations, IEnumerable<QrTrackableStatus> trackables = null)
         {
             Platform = platform ?? throw new ArgumentNullException(nameof(platform));
             Observations = new List<QrObservation>(observations ?? throw new ArgumentNullException(nameof(observations))).AsReadOnly();
+            Trackables = new List<QrTrackableStatus>(trackables ?? Array.Empty<QrTrackableStatus>()).AsReadOnly();
         }
     }
 

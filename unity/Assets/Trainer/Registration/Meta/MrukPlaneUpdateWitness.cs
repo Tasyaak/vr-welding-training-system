@@ -28,7 +28,7 @@ namespace WeldingTrainer.Registration.Meta
             if (!ReferenceEquals(boundary, current))
             {
                 Reset(current);
-                return current != null;
+                return true; // Plane removal is an invalidating SDK change, not permission to reuse the old pose.
             }
 
             if (current == null)

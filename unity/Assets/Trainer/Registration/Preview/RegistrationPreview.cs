@@ -18,6 +18,8 @@ namespace WeldingTrainer.Registration.Preview
         public Material ghostMaterial;
         public TextMesh statusText;
         public bool rightControllerSmokeCommands = true;
+        [Tooltip("Logs real MRUK events, tracking transitions and witnessed SDK updates. Does not alter registration.")]
+        public bool diagnosticQrLogging;
         private RegistrationSession session;
         private MetaQrTracker tracker;
         private GameObject fixtureGhost, partGhost;
@@ -49,7 +51,7 @@ namespace WeldingTrainer.Registration.Preview
                     fixtures.Add(item.id, meshes[item.sourceId]);
                 foreach (var item in data.workpieces)
                     parts.Add(item.id, meshes[item.sourceId]);
-                tracker = new MetaQrTracker(mruk, rig, adapterQualification, clock);
+                tracker = new MetaQrTracker(mruk, rig, adapterQualification, clock, diagnosticQrLogging ? (Action<string>)(message => Debug.Log(message)) : null);
                 session = new RegistrationSession(content, clock, tracker, new MetaSessionAnchorFactory(clock), new PreviewLog());
                 Debug.Log("Registration device tuple: " + tracker.RuntimeTuple);
                 session.Start();
@@ -95,12 +97,17 @@ namespace WeldingTrainer.Registration.Preview
             {
                 string selected = snapshot.Binding == null ? "No selected assembly" : $"{snapshot.Binding.PartId} r{snapshot.Binding.PartRevision} / {snapshot.Binding.FixtureId} r{snapshot.Binding.FixtureRevision}\nMount r{snapshot.Binding.MountRevision} / binding r{snapshot.Binding.Revision}";
                 statusText.text = $"QR REGISTRATION — STANDALONE A\n{snapshot.State}: {snapshot.Reason}\n{selected}\n" + $"Generation {snapshot.Generation} / origin {snapshot.OriginGeneration}\n" + $"Observations {snapshot.ObservationCount}, span {snapshot.ObservationSpanSeconds:F1}s\n" + $"Scatter {Format(snapshot.TranslationScatterMetres, 1000)} mm / {Format(snapshot.AngularScatterRadians, 180 / Math.PI)} deg\n" + $"Physical qualification: {(snapshot.PhysicallyQualified ? "recorded" : "UNQUALIFIED")} / scoring: {(snapshot.EligibleForScoring ? "content ready" : "blocked")}\n" + "A: start/retry; B: cancel and release anchor\n" + "At Preview, A declares ALL THREE:\ncorrect part mounted; bolts secured; overlay plausible.\n" + "Do not move/rebolt the assembly. B cancels before changes.\n" + "Unknown print/frame evidence blocks registration; no override.";
+                if (snapshot.Reason == RegistrationReason.AwaitingTrackedQr)
+                    statusText.text += "\nQR temporarily unavailable: candidate retained; CONFIRM BLOCKED.";
                 var raw = tracker.LastFrame;
-                if (raw != null && raw.Observations.Count == 1)
-                {
-                    var o = raw.Observations[0];
-                    statusText.text += $"\nRaw MRUK plane: {o.WidthMetres * 1000:F1} x {o.HeightMetres * 1000:F1} mm\nSDK sequence {o.Sequence}; age {Time.realtimeSinceStartupAsDouble - o.ReceivedAt:F1}s";
-                }
+                if (raw != null)
+                    foreach (var tracked in raw.Trackables)
+                    {
+                        var o = tracked.LastObservation;
+                        statusText.text += $"\nMRUK object {tracked.TrackableId}: {(tracked.IsTracked ? "Tracked" : "Untracked")}" + (tracked.AwaitingTrackedUpdate ? " / awaiting tracked update" : "");
+                        if (o != null)
+                            statusText.text += $"\nLast SDK plane (history): {o.WidthMetres * 1000:F1} x {o.HeightMetres * 1000:F1} mm" + $" seq {o.Sequence}; age {Time.realtimeSinceStartupAsDouble - o.ReceivedAt:F1}s";
+                    }
             }
         }
 

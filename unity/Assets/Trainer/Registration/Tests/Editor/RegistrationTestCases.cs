@@ -85,6 +85,7 @@ namespace WeldingTrainer.Registration.Tests
         {
             public readonly FakeClock Clock;
             public QrObservation[] Observations = Array.Empty<QrObservation>();
+            public QrTrackableStatus[] Trackables = Array.Empty<QrTrackableStatus>();
             public bool Supported = true, Config = true, Applied = true, Convention = true, Tracking = true;
             public PermissionState Permission = PermissionState.Granted;
             public long Origin = 1;
@@ -113,7 +114,7 @@ namespace WeldingTrainer.Registration.Tests
                 Clock.Now += AdvanceOnRead;
                 if (ThrowRead)
                     throw new InvalidOperationException("synthetic read failure");
-                return new TrackerFrame(new PlatformStatus(Supported, Permission, Config, Requested, Applied, Convention, Tracking, Origin, Clock.Now - Age, "synthetic-runtime", "synthetic convention evidence"), Observations);
+                return new TrackerFrame(new PlatformStatus(Supported, Permission, Config, Requested, Applied, Convention, Tracking, Origin, Clock.Now - Age, "synthetic-runtime", "synthetic convention evidence"), Observations, Trackables);
             }
 
             public void Dispose()
@@ -176,14 +177,25 @@ namespace WeldingTrainer.Registration.Tests
                 Session.Start();
             }
 
-            public QrObservation Observation(string payload = "LW1:PART-001", RigidPose? pose = null, double size = .06, double age = 0, Vec3? eye = null, long? seq = null, string convention = "ExcludesQuietZone")
+            public QrObservation Observation(string payload = "LW1:PART-001", RigidPose? pose = null, double size = .06, double age = 0, Vec3? eye = null, long? seq = null, string convention = "ExcludesQuietZone", string id = "qr1")
             {
                 var p = pose ?? Marker;
-                return new QrObservation(Encoding.UTF8.GetBytes(payload), "qr1", seq ?? ++sequence, Tracker.Origin, Clock.Now - age, p, size, size, convention, eye ?? p.TransformPoint(new Vec3(0, 0, .5)));
+                return new QrObservation(Encoding.UTF8.GetBytes(payload), id, seq ?? ++sequence, Tracker.Origin, Clock.Now - age, p, size, size, convention, eye ?? p.TransformPoint(new Vec3(0, 0, .5)));
+            }
+
+            public void Unavailable(bool tracked = false)
+            {
+                Tracker.Observations = Array.Empty<QrObservation>();
+                Tracker.Trackables = new[]
+                {
+                    new QrTrackableStatus("qr1", tracked, true, null)
+                };
+                Session.Tick();
             }
 
             public void Sample(QrObservation observation = null)
             {
+                Tracker.Trackables = Array.Empty<QrTrackableStatus>();
                 Tracker.Observations = new[]
                 {
                     observation ?? Observation()
@@ -251,6 +263,177 @@ namespace WeldingTrainer.Registration.Tests
         public IEnumerable<KeyValuePair<string, Action>> Cases()
         {
             var tests = new Dictionary<string, Action>();
+            tests.Add("Temporary untracked status retains accumulation without new evidence", () =>
+            {
+                using (var h = new Harness(Catalog()))
+                {
+                    h.Sample();
+                    h.Clock.Now += .75;
+                    h.Sample();
+                    var received = h.Session.LastSnapshot.LastQrReceivedAt;
+                    h.Clock.Now += .1;
+                    h.Unavailable();
+                    Equal(2, h.Session.LastSnapshot.ObservationCount);
+                    Equal(received, h.Session.LastSnapshot.LastQrReceivedAt);
+                    Equal(RegistrationReason.AwaitingTrackedQr, h.Session.LastSnapshot.Reason);
+                    h.Clock.Now += .65;
+                    h.Sample();
+                    h.Clock.Now += .75;
+                    h.Sample();
+                    Equal(RegistrationState.Preview, h.Session.LastSnapshot.State);
+                }
+            });
+            tests.Add("Preview pauses and cannot confirm without a new tracked update", () =>
+            {
+                using (var h = new Harness(Catalog()))
+                {
+                    h.Preview();
+                    var old = h.Tracker.Observations[0];
+                    h.Clock.Now += .1;
+                    h.Unavailable();
+                    h.Session.Confirm(true, true, true);
+                    Equal(RegistrationState.Preview, h.Session.LastSnapshot.State);
+                    Equal(RegistrationReason.AwaitingTrackedQr, h.Session.LastSnapshot.Reason);
+                    Equal(0, h.Anchors.Created.Count);
+                    Check(!h.Session.LastSnapshot.IsValid);
+                    h.Unavailable(tracked: true);
+                    h.Session.Confirm(true, true, true);
+                    Equal(0, h.Anchors.Created.Count);
+                    h.Sample(old); // Even a badly implemented port cannot unlock confirmation by replay.
+                    h.Session.Confirm(true, true, true);
+                    Equal(0, h.Anchors.Created.Count);
+                    h.Clock.Now += .1;
+                    h.Sample();
+                    Equal(RegistrationReason.AwaitingConfirmation, h.Session.LastSnapshot.Reason);
+                    h.Session.Confirm(true, true, true);
+                    Equal(1, h.Anchors.Created.Count);
+                }
+            });
+            tests.Add("Long untracked gap expires original evidence and still times out", () =>
+            {
+                using (var h = new Harness(Catalog()))
+                {
+                    h.Preview();
+                    var received = h.Session.LastSnapshot.LastQrReceivedAt;
+                    for (int i = 0; i < 16; i++)
+                    {
+                        h.Clock.Now += .1;
+                        h.Unavailable();
+                    }
+
+                    Equal(RegistrationState.Acquiring, h.Session.LastSnapshot.State);
+                    Equal(RegistrationReason.StaleObservation, h.Session.LastSnapshot.Reason);
+                    Equal(0, h.Session.LastSnapshot.ObservationCount);
+                    Equal(received, h.Session.LastSnapshot.LastQrReceivedAt);
+                    Check(!h.Session.LastSnapshot.WorldFromWorkpiece.HasValue);
+                    h.Session.Confirm(true, true, true);
+                    Equal(0, h.Anchors.Created.Count);
+                    h.Clock.Now += 46;
+                    h.Session.Tick();
+                    Equal(RegistrationReason.Timeout, h.Session.LastSnapshot.Reason);
+                }
+            });
+            tests.Add("Actual trackable removal discards preview immediately", () =>
+            {
+                using (var h = new Harness(Catalog()))
+                {
+                    h.Preview();
+                    h.Tracker.Observations = Array.Empty<QrObservation>();
+                    h.Tracker.Trackables = Array.Empty<QrTrackableStatus>();
+                    h.Session.Tick();
+                    Equal(RegistrationState.Acquiring, h.Session.LastSnapshot.State);
+                    Equal(RegistrationReason.AwaitingQr, h.Session.LastSnapshot.Reason);
+                    Equal(0, h.Session.LastSnapshot.ObservationCount);
+                }
+            });
+            tests.Add("New SDK lifetime with identical payload cannot inherit stability", () =>
+            {
+                using (var h = new Harness(Catalog()))
+                {
+                    h.Preview();
+                    h.Clock.Now += .1;
+                    h.Unavailable();
+                    h.Sample(h.Observation(id: "qr1:new-lifetime"));
+                    Equal(RegistrationReason.AmbiguousQr, h.Session.LastSnapshot.Reason);
+                    Equal(0, h.Session.LastSnapshot.ObservationCount);
+                    h.Clock.Now += .1;
+                    h.Sample(h.Observation(id: "qr1:new-lifetime"));
+                    Equal(1, h.Session.LastSnapshot.ObservationCount);
+                    Equal(RegistrationState.Acquiring, h.Session.LastSnapshot.State);
+                }
+            });
+            foreach (var failure in new[]
+            {
+                RegistrationReason.MalformedPayload,
+                RegistrationReason.UnknownPart,
+                RegistrationReason.DimensionsMismatch
+            }
+
+            )
+            {
+                var expected = failure;
+                tests.Add("Resume after dropout still rejects " + expected, () =>
+                {
+                    using (var h = new Harness(Catalog()))
+                    {
+                        h.Preview();
+                        h.Unavailable();
+                        h.Clock.Now += .1;
+                        h.Sample(h.Observation(payload: expected == RegistrationReason.MalformedPayload ? "bad" : expected == RegistrationReason.UnknownPart ? "LW1:OTHER" : "LW1:PART-001", size: expected == RegistrationReason.DimensionsMismatch ? .09 : .06));
+                        h.Session.Confirm(true, true, true);
+                        Equal(expected, h.Session.LastSnapshot.Reason);
+                        Equal(0, h.Anchors.Created.Count);
+                        Check(!h.Session.LastSnapshot.WorldFromWorkpiece.HasValue);
+                    }
+                });
+            }
+
+            tests.Add("Nonfinite bounds invalidate earlier stable evidence", () =>
+            {
+                using (var h = new Harness(Catalog()))
+                {
+                    h.Preview();
+                    h.Sample(h.Observation(size: double.NegativeInfinity));
+                    Equal(RegistrationReason.DimensionsMismatch, h.Session.LastSnapshot.Reason);
+                    Equal(0, h.Session.LastSnapshot.ObservationCount);
+                    Check(!h.Session.LastSnapshot.WorldFromFixture.HasValue);
+                }
+            });
+            tests.Add("Registered untracked object is diagnostic only but origin remains authoritative", () =>
+            {
+                using (var h = new Harness(Catalog()))
+                {
+                    h.Register();
+                    h.Clock.Now += 10;
+                    h.Unavailable();
+                    Check(h.Session.LastSnapshot.IsValid);
+                    h.Tracker.Origin++;
+                    h.Session.Tick();
+                    Equal(RegistrationReason.OriginChanged, h.Session.LastSnapshot.Reason);
+                    Check(!h.Session.LastSnapshot.WorldFromWorkpiece.HasValue);
+                }
+            });
+            tests.Add("Stale extra QR does not masquerade as fresh ambiguity after registration", () =>
+            {
+                using (var h = new Harness(Catalog()))
+                {
+                    h.Register();
+                    h.Tracker.Observations = new[]
+                    {
+                        h.Observation(),
+                        h.Observation("LW1:OTHER", age: 2)
+                    };
+                    h.Session.Tick();
+                    Check(h.Session.LastSnapshot.IsValid);
+                    h.Tracker.Observations = new[]
+                    {
+                        h.Observation(),
+                        h.Observation()
+                    };
+                    h.Session.Tick();
+                    Equal(RegistrationReason.AmbiguousQr, h.Session.LastSnapshot.Reason);
+                }
+            });
             tests.Add("Port receive timestamps may advance during a read", () =>
             {
                 using (var h = new Harness(Catalog()))

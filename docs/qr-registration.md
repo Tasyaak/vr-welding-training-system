@@ -131,8 +131,15 @@ lists and repeated polling. `Transform.hasChanged` is deliberately not used:
 Unity's equal-pose setters do not reliably change it. Starting a generation seeds
 witnesses from existing objects so old poses cannot count as new observations.
 Polling cached data retains its sequence
-and receive time; it cannot manufacture fresh samples. Removed/untracked objects
-leave the batch. `SourceCapturedAt`, confidence and absolute accuracy remain null.
+and receive time; it cannot manufacture fresh samples. `MrukQrTrackableCache`
+keeps membership until MRUK removal (with enumeration reconciliation), independently
+of `IsTracked`. Temporarily untracked entries retain diagnostic history in
+`TrackerFrame.Trackables`, but emit no active observation. Their witnesses are still
+consumed; reacquisition needs a tracked SDK update, not just a flipped tracked flag.
+Instance IDs are paired with a local lifetime counter; removal/reset never transfers
+evidence to a replacement object. Existing objects at scan/origin start are seeded
+without fresh evidence. Plane removal/nonfinite bounds invalidate evidence rather
+than retaining an earlier good pose. `SourceCapturedAt`, confidence and absolute accuracy remain null.
 Receive time is a host monotonic timestamp, **not** a camera exposure timestamp.
 
 `RegistrationQuality` / `qr-stability-v1` defines software gates:
@@ -174,7 +181,15 @@ Preview shows both metre-space meshes with the resolved part/fixture/mount revis
 Confirmation declares the correct physical part, secured bolts and plausible
 overlay. This is operator evidence, not sensed authentication. `Confirm` rechecks
 the gates and freshness before allocating any anchor. Retry/cancel never bypass
-them. The adapter creates one `OVRSpatialAnchor` object and polls creation,
+them. A brief same-object dropout pauses Acquiring/Preview with
+`AwaitingTrackedQr`; it preserves history/candidate only until the original last
+observation reaches 1.5 s. Confirmation is blocked throughout the pause, even while
+the diagnostic candidate ghost remains visible. A new, validated tracked update
+must resume it. No grace clock is reset. Real removal, different identity, invalid
+evidence or expiration discards the candidate/window. See the
+[hardware follow-up and acceptance procedure](qr-registration-hardware-followup.md).
+
+The adapter creates one `OVRSpatialAnchor` object and polls creation,
 localization and tracked pose. It never calls Save, Load, Share or Erase.
 
 ```text
