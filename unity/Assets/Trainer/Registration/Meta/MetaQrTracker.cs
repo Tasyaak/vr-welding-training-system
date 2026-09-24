@@ -140,6 +140,7 @@ namespace WeldingTrainer.Registration.Meta
             ApplyRequest();
             samples.Clear();
             updates.Clear();
+            LastFrame = null;
         }
 
         public TrackerFrame Read()
