@@ -1,0 +1,7 @@
+{
+  "name": "WeldingTrainer.Registration.Tests",
+  "references": ["WeldingTrainer.Registration", "WeldingTrainer.Registration.Meta", "WeldingTrainer.Registration.Preview", "WeldingTrainer.Content.Spatial", "WeldingTrainer.Content.Spatial.Unity", "Oculus.VR", "meta.xr.mrutilitykit"],
+  "includePlatforms": ["Editor"],
+  "optionalUnityReferences": ["TestAssemblies"],
+  "autoReferenced": false
+}

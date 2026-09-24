@@ -99,6 +99,14 @@ visible in metrics; output/coverage cannot bridge unknown samples.
 
 ## Testing and implementation state
 
+#49 implements `Trainer/Registration`: a pure spatial state machine and immutable
+snapshots, Meta QR/unsaved-anchor adapters, and an independent ghost/status scene.
+It consumes merged #77 marker alternatives and approved semantic content without
+changing them. [Runtime registration](qr-registration.md) defines candidate selection
+gates, physical qualification separation, RH/Unity conversion, lifetime and tests.
+Bootstrap still awaits #58 composition; a software-valid registration does not
+grant scoring authority.
+
 Baseline main ee8999e contained only demo code and the Quest scene. #46 adds
 independent Content/Spatial assemblies, original CAD, reproducible finite meshes,
 versioned marker/assembly authoring, validation and immutable export. See

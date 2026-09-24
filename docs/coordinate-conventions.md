@@ -22,6 +22,14 @@ Marker normalization is performed once in the Meta adapter. Document MRUK
 origin/axes, corner order, normal direction and whether dimensions include the
 quiet zone. Never guess these from a visually plausible overlay.
 
+The [#49 adapter](qr-registration.md#capability-permission-and-coordinate-normalization)
+encodes World and other pure poses in the RH basis used by authored content.
+Unity presentation is a distinct numeric encoding of the same physical space:
+`S_z = diag(1,1,-1)` changes vector basis and `S_z R S_z` changes ordinary poses.
+MRUK marker normalization additionally accounts for its reflected local X. Runtime
+visual copies convert vertices/normals/winding; source content and rigid scale stay
+unchanged. Consumers must not pass raw Unity vectors into this RH contract.
+
 ## Registration composition
 
 The catalog contains `FixtureFromMarker` and `FixtureFromWorkpiece`.

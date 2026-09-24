@@ -1,0 +1,5 @@
+{
+  "name": "WeldingTrainer.Registration.Meta",
+  "references": ["WeldingTrainer.Registration", "WeldingTrainer.Content.Spatial", "Oculus.VR", "meta.xr.mrutilitykit"],
+  "autoReferenced": false
+}

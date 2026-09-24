@@ -94,6 +94,12 @@ always invalidates output. New session requires a fresh QR registration.
 
 ## Physical qualification (#66)
 
+The [#49 implementation](qr-registration.md) preserves both print alternatives and
+the approved seam content. It never chooses a print from the shared payload or
+observed size. Selected print thickness is not installed-plane qualification;
+explicit installation and SDK-convention evidence are required before registration.
+The actual assembly/anchor error budget remains this issue's physical evidence.
+
 Determine and record, rather than invent:
 - comparison and selection of QR-PRINT-A/B, verification of their specified
   dimensions/thickness and print quality, and actual installed plane/offset/orientation;

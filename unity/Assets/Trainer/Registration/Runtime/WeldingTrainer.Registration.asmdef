@@ -1,0 +1,7 @@
+{
+  "name": "WeldingTrainer.Registration",
+  "rootNamespace": "WeldingTrainer.Registration",
+  "references": ["WeldingTrainer.Content.Spatial"],
+  "autoReferenced": false,
+  "noEngineReferences": true
+}

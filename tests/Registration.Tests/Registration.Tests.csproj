@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework Condition="'$(RegistrationTargetFramework)' == ''">net9.0</TargetFramework>
+    <TargetFramework Condition="'$(RegistrationTargetFramework)' != ''">$(RegistrationTargetFramework)</TargetFramework>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="../../unity/Assets/Trainer/Content/Spatial/Runtime/*.cs" />
+    <Compile Include="../../unity/Assets/Trainer/Registration/Runtime/*.cs" />
+    <Compile Include="../../unity/Assets/Trainer/Registration/Tests/Editor/RegistrationTestCases.cs" />
+  </ItemGroup>
+</Project>
