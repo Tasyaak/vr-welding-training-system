@@ -1,4 +1,5 @@
 """Group A tool boundary checks and the shared engine-independent C# cases."""
+import os
 import json
 import re
 import shutil
@@ -26,14 +27,96 @@ def check_tool(errors):
         dotnet = shutil.which('dotnet')
         if not dotnet:
             raise ValueError('Tool tests require .NET SDK >= 8')
-        sdk = subprocess.check_output([dotnet, '--list-sdks'], text=True)
-        major = max(int(x) for x in re.findall(r'^(\d+)\.', sdk, re.M) if int(x) >= 8)
-        framework = f'net{major}.0'
+
+        installed = subprocess.check_output(
+            [dotnet, '--list-sdks'],
+            text=True,
+        )
+
+        majors = [
+            int(value)
+            for value in re.findall(
+                r'^(\d+)\.\d+\.\d+\s',
+                installed,
+                re.MULTILINE,
+            )
+            if int(value) >= 8
+        ]
+
+        if not majors:
+            raise ValueError('No stable .NET SDK >= 8')
+
+        framework = f'net{max(majors)}.0'
         project = ROOT / 'tests/Tool.Tests'
-        result = subprocess.run([dotnet, 'run', '--project', str(project), f'-p:ToolTargetFramework={framework}'], cwd=ROOT, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=120)
+
+        environment = dict(
+            os.environ,
+            DOTNET_CLI_TELEMETRY_OPTOUT='1',
+            DOTNET_NOLOGO='1',
+        )
+
+        build = subprocess.run(
+            [
+                dotnet,
+                'build',
+                str(project),
+                '--nologo',
+                f'-p:ToolTargetFramework={framework}',
+            ],
+            cwd=ROOT,
+            env=environment,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            timeout=120,
+            check=False,
+        )
+
+        if build.returncode:
+            errors.append(
+                'Tool C# build failed:\n' + build.stdout
+            )
+            return
+
+        assembly = (
+            project
+            / 'bin'
+            / 'Debug'
+            / framework
+            / 'Tool.Tests.dll'
+        )
+
+        if not assembly.is_file():
+            errors.append(
+                f'Tool C# build succeeded but test assembly is missing: {assembly}'
+            )
+            return
+
+        result = subprocess.run(
+            [
+                dotnet,
+                str(assembly),
+            ],
+            cwd=ROOT,
+            env=environment,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            timeout=120,
+            check=False,
+        )
+
         if result.returncode:
-            errors.append('Tool C# suite failed:\n' + result.stdout)
+            errors.append(
+                'Tool C# suite failed:\n' + result.stdout
+            )
         else:
-            print('Tool C# suite: ' + result.stdout.strip().splitlines()[-1])
-    except (ValueError, OSError, subprocess.SubprocessError) as e:
-        errors.append('Tool tests could not run: ' + str(e))
+            print(
+                f'Tool C# suite ({framework}): '
+                + result.stdout.strip().splitlines()[-1]
+            )
+
+    except (ValueError, OSError, subprocess.SubprocessError) as error:
+        errors.append(
+            'Tool tests could not run: ' + str(error)
+        )

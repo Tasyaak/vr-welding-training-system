@@ -1,0 +1,42 @@
+{
+    "schemaVersion": 1,
+    "assemblyId": "quest3-right-01-glued-tool-01",
+    "revision": "20260925T033729559Z",
+    "interactionProfile": "/interaction_profiles/oculus/touch_controller",
+    "evidence": "Operator confirmed tip, body axis, roll reference, multiple wrist orientations and measured error bounds per right-tool runbook.",
+    "qualifiedUtc": "2026-09-25T03:37:29.5599880Z",
+    "qualified": true,
+    "convention": "RH-Sz/grip/metres/xyzw; Tool+Z=body; incident=-Z",
+    "cadSha256": "3ef01a87a06bcc5366b3dc441b3ede4fc51ae2aee63d9536b30f24510b8442a6",
+    "controllerTipMetres": {
+        "x": -0.02100000000000001,
+        "y": -0.10720000000000009,
+        "z": -0.1085000000000001
+    },
+    "controllerToolRotation": {
+        "x": -0.43182253383837906,
+        "y": 0.030344935425108793,
+        "z": 0.01723832254408359,
+        "w": 0.9012831543967294
+    },
+    "toolFromTip": {
+        "destination": "Tool",
+        "source": "Tip",
+        "position": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": -0.06100000000000005
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0,
+            "w": 1.0
+        },
+        "scale": 1.0
+    },
+    "maxObservedTipErrorMm": 2.0,
+    "maxObservedOrientationErrorDegrees": 2.0,
+    "acceptedTipErrorMm": 3.0,
+    "acceptedOrientationErrorDegrees": 3.0
+}
