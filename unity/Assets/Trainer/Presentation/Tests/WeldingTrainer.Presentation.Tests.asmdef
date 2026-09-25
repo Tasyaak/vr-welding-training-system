@@ -1,0 +1,19 @@
+{
+  "name": "WeldingTrainer.Presentation.Tests",
+  "rootNamespace": "WeldingTrainer.Presentation.Tests",
+  "references": [
+    "WeldingTrainer.Domain",
+    "WeldingTrainer.Presentation"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "autoReferenced": false,
+  "noEngineReferences": false,
+  "defineConstraints": [
+    "UNITY_INCLUDE_TESTS"
+  ],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ]
+}
