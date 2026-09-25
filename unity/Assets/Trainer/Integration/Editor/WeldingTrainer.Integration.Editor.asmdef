@@ -1,0 +1,17 @@
+{
+  "name": "WeldingTrainer.Integration.Editor",
+  "references": [
+    "WeldingTrainer.Integration",
+    "WeldingTrainer.Domain",
+    "WeldingTrainer.Application",
+    "WeldingTrainer.Presentation",
+    "WeldingTrainer.Tool.Unity",
+    "WeldingTrainer.Registration.Meta",
+    "WeldingTrainer.Content.Spatial.Unity",
+    "Oculus.VR",
+    "WeldingTrainer.Content.Spatial"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ]
+}

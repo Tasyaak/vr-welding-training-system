@@ -58,7 +58,9 @@ and their own test fixtures; B does not wait for live QR or the actual CAD asset
 
 Use Unity `6000.3.24f1`, Android Build Support, Meta Core/MRUK `205.0.0`
 and OpenXR `1.16.1`. Open the existing `unity` directory in Unity Hub,
-then `Assets/Trainer/Scenes/Bootstrap.unity`. Keep package versions pinned.
+then `Assets/Trainer/Scenes/FusionMvp.unity` for the integrated Fusion presentation.
+See the [MVP flow, station configuration and verification limits](docs/fusion-mvp.md).
+Keep package versions pinned.
 
 Run `python tests/repository_checks.py`; follow [setup](docs/setup.md)
 for Unity and standalone Quest validation. Use the separate RegistrationPreview
