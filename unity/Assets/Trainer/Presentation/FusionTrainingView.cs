@@ -243,10 +243,8 @@ namespace WeldingTrainer.Presentation
         public static string CueText(FeedbackCue cue) => cue switch
         {
             FeedbackCue.EmergencyStop => "STOP - release trigger, then acknowledge",
-            FeedbackCue.ReflectionRisk => "Reflected direction unsafe / unavailable",
             FeedbackCue.TrackingLost => "Tool or head tracking unavailable",
             FeedbackCue.RegistrationLost => "Register the secured workpiece",
-            FeedbackCue.NozzleMismatch => "Select the welding nozzle",
             FeedbackCue.ClampDisconnected => "Connect the virtual clamp",
             FeedbackCue.ContactInvalid => "Move tip onto the finite weld surface",
             FeedbackCue.ActivationBlocked => "Output inhibited - check status above",

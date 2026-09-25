@@ -254,6 +254,10 @@ namespace WeldingTrainer.Integration
         void Prepare()
         {
             profile = new FusionProfile("fusion-mvp", 1, "fusion-mvp-v1:4mm:15-35mms:20deg:100ms", seam.Id, .004, .004, .015, .035, 20 * Math.PI / 180, 20 * Math.PI / 180, .003, .002, .1, .01, .002, .006);
+            // This scene has one fixed Fusion tool. Select its welding nozzle
+            // through the authoritative coordinator before opening the attempt.
+            coordinator.Submit(TrainingCommandType.SelectWeldingNozzle, Seconds);
+            coordinator.Tick();
             attempt = coordinator.PrepareAttempt(new ProcessConfiguration(binding.FixtureId, seam.Id, new ProcessProfile(profile.Id, profile.Version, ProcessMode.Fusion, profile.Hash, .1)));
             evaluator = new WeldPathEvaluator(seam, new PathEvaluationPolicy(.015, .035, .12, .1, .01, .00005, .000001, .03), new PathEvaluationContext(State.SessionId, attempt.AttemptId, binding.WorkpieceGeometry.ContentHash, attempt.RegistrationGeneration, input.OriginGeneration));
             fusion = new FusionProcessKernel(attempt.AttemptId, seam, profile);
@@ -309,9 +313,7 @@ namespace WeldingTrainer.Integration
 
             if (State.Session == SessionState.Ready)
             {
-                if (State.Nozzle != NozzleState.Welding)
-                    coordinator.Submit(TrainingCommandType.SelectWeldingNozzle, Seconds);
-                else if (State.Clamp != ClampState.Connected)
+                if (State.Clamp != ClampState.Connected)
                     coordinator.Submit(TrainingCommandType.ConnectClamp, Seconds);
                 else
                     coordinator.Submit(TrainingCommandType.Arm, Seconds);
@@ -336,21 +338,9 @@ namespace WeldingTrainer.Integration
                 }
             }
 
-            RiskState risk = RiskState.Unknown;
-            if (contact.State == ContactState.Contact && poseValid)
-            {
-                double dot = DVec.Dot(incident, contact.Normal);
-                if (dot < -.05)
-                {
-                    var reflected = (incident - contact.Normal * (2 * dot)).Normalized;
-                    var toHead = head - contact.ClosestPoint;
-                    double along = DVec.Dot(toHead, reflected);
-                    double lateral = (toHead - reflected * along).Length;
-                    risk = along > 0 && lateral < .12 + along * Math.Tan(15 * Math.PI / 180) ? RiskState.High : RiskState.Low;
-                }
-            }
-
-            return new SafetyInput(true, false, spatialValid, registered.FixtureId == frozen.Process.FixtureId, false, contact, risk, BlockReason.None);
+            // Reflection assessment is intentionally absent from this Fusion
+            // presentation mode. Keep finite contact and the other interlocks.
+            return new SafetyInput(true, false, spatialValid, registered.FixtureId == frozen.Process.FixtureId, false, contact, RiskState.Low, BlockReason.None);
         }
 
         FusionAttemptSummary FinalizeSummary(bool interrupted)
@@ -387,7 +377,7 @@ namespace WeldingTrainer.Integration
             if (State.Session == SessionState.Suspended)
                 return "Release trigger  /  A: acknowledge, then resume";
             if (State.Session == SessionState.Ready)
-                return State.Nozzle != NozzleState.Welding ? "A: select welding nozzle" : State.Clamp != ClampState.Connected ? "A: connect virtual clamp" : "Tip to START, release trigger  /  A: arm";
+                return State.Clamp != ClampState.Connected ? "A: connect virtual clamp" : "Tip to START, release trigger  /  A: arm";
             return "Trigger: weld  /  stick click: finish  /  B: STOP";
         }
 

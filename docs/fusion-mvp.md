@@ -11,7 +11,8 @@ Unity: 6000.3.24f1. Existing package versions are unchanged.
    right A explicitly confirms all three. The existing registration runtime owns
    QR acquisition, evidence, and the unsaved anchor.
 2. The authored `PART-001-T-JOINT` (184.746 mm, original direction) is selected.
-   A selects the welding nozzle; another A connects the virtual clamp.
+   The welding nozzle is selected automatically for this fixed Fusion tool. A
+   connects the virtual clamp.
 3. Place the calibrated tip at green START, release the trigger and press A to
    arm. Hold the right trigger and follow the seam. Target speed is 15–35 mm/s;
    lateral/normal tolerances are each 4 mm. Work angle is relative to the authored
@@ -71,11 +72,10 @@ Evaluation uses immutable RH Workpiece coordinates from the registered pose,
 not scene transforms. Presentation converts RH to Unity exactly once.
 
 The original authored primary face's triangles provide finite contact evidence;
-shared coplanar triangle edges are treated as one support. Incident tool -Z,
-contact normal and tracked head produce a conservative reflected-direction cone
-(15 degrees plus 120 mm head radius). Unknown/unsafe evidence inhibits through
-the existing reducer; this is a simplified training risk check, not laser safety
-certification. The selected T-joint bisector supplies the work-angle reference.
+shared coplanar triangle edges are treated as one support. The Fusion presentation
+mode does not assess reflection direction or inhibit output for that reason. This
+mode must not be represented as laser-safety validation. The selected T-joint
+bisector supplies the work-angle reference.
 
 `WeldPathEvaluator` remains measurement owner. `TrainingCoordinator` /
 `ActivationReducer` remain activation owner. `FusionProcessKernel` consumes their
