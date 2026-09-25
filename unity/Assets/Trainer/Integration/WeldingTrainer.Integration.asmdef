@@ -1,0 +1,15 @@
+{
+  "name": "WeldingTrainer.Integration",
+  "rootNamespace": "WeldingTrainer.Integration",
+  "references": [
+    "WeldingTrainer.Application",
+    "WeldingTrainer.Domain",
+    "WeldingTrainer.Content.Spatial",
+    "WeldingTrainer.Content.Spatial.Unity",
+    "WeldingTrainer.Registration",
+    "WeldingTrainer.Registration.Meta",
+    "Oculus.VR",
+    "meta.xr.mrutilitykit"
+  ],
+  "autoReferenced": false
+}
