@@ -1,0 +1,7 @@
+{
+  "name": "WeldingTrainer.Tool",
+  "references": [
+    "WeldingTrainer.Content.Spatial"
+  ],
+  "autoReferenced": false
+}

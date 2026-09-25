@@ -1,0 +1,11 @@
+{
+  "name": "WeldingTrainer.Tool.Unity",
+  "references": [
+    "WeldingTrainer.Tool",
+    "WeldingTrainer.Content.Spatial",
+    "WeldingTrainer.Content.Spatial.Unity",
+    "Unity.InputSystem",
+    "Unity.XR.OpenXR"
+  ],
+  "autoReferenced": false
+}

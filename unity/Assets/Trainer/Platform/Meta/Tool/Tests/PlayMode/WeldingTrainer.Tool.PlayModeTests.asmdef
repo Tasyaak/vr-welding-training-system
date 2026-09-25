@@ -1,0 +1,16 @@
+{
+  "name": "WeldingTrainer.Tool.PlayModeTests",
+  "references": [
+    "WeldingTrainer.Tool",
+    "WeldingTrainer.Tool.Unity",
+    "WeldingTrainer.Content.Spatial",
+    "WeldingTrainer.Content.Spatial.Unity",
+    "Unity.InputSystem",
+    "Unity.InputSystem.TestFramework",
+    "Unity.XR.OpenXR"
+  ],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ],
+  "autoReferenced": false
+}

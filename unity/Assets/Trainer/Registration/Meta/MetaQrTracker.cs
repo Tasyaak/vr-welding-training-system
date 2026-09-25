@@ -14,36 +14,12 @@ namespace WeldingTrainer.Registration.Meta
 
     public static class UnityRegistrationPose
     {
-        // Explicit handedness boundary: S_z = diag(1,1,-1), not a rigid reflection quaternion.
-        public static Vec3 ToDomain(Vector3 v) => new Vec3(v.x, v.y, -v.z);
-        public static Vector3 ToUnity(Vec3 v) => new Vector3((float)v.x, (float)v.y, (float)-v.z);
-        public static Quat ToDomain(Quaternion q)
-        {
-            double x = q.x, y = q.y, z = q.z, w = q.w;
-            double lengthSquared = x * x + y * y + z * z + w * w;
-            // Only remove float SDK roundoff before entering the stricter double-precision content contract.
-            if (!RegistrationMath.Finite(lengthSquared) || Math.Abs(lengthSquared - 1) > 1e-5)
-                throw new ArgumentException("SDK quaternion must be finite and unit length (float roundoff only)");
-            double length = Math.Sqrt(lengthSquared);
-            return new Quat(-x / length, -y / length, z / length, w / length);
-        }
-
-        public static Quaternion ToUnity(Quat q) => new Quaternion((float)-q.x, (float)-q.y, (float)q.z, (float)q.w);
-        public static RigidPose Read(Transform transform, string source)
-        {
-            var scale = transform.lossyScale;
-            if (!RegistrationMath.Finite(scale.x) || !RegistrationMath.Finite(scale.y) || !RegistrationMath.Finite(scale.z) || (scale - Vector3.one).sqrMagnitude > 1e-10f)
-                throw new ArgumentException("Spatial transform requires unit scale");
-            var p = transform.position;
-            var r = transform.rotation;
-            return RegistrationMath.Pose("World", source, ToDomain(p), ToDomain(r));
-        }
-
-        public static void Write(Transform transform, RigidPose pose)
-        {
-            transform.SetPositionAndRotation(ToUnity(pose.Position), ToUnity(pose.Rotation));
-            transform.localScale = Vector3.one;
-        }
+        public static Vec3 ToDomain(Vector3 v) => WeldingTrainer.Content.Spatial.Unity.UnitySpatialPose.ToDomain(v);
+        public static Vector3 ToUnity(Vec3 v) => WeldingTrainer.Content.Spatial.Unity.UnitySpatialPose.ToUnity(v);
+        public static Quat ToDomain(Quaternion q) => WeldingTrainer.Content.Spatial.Unity.UnitySpatialPose.ToDomain(q);
+        public static Quaternion ToUnity(Quat q) => WeldingTrainer.Content.Spatial.Unity.UnitySpatialPose.ToUnity(q);
+        public static RigidPose Read(Transform transform, string source) => WeldingTrainer.Content.Spatial.Unity.UnitySpatialPose.Read(transform, source);
+        public static void Write(Transform transform, RigidPose pose) => WeldingTrainer.Content.Spatial.Unity.UnitySpatialPose.Write(transform, pose);
     }
 
     public sealed class MetaQrTracker : IQrTracker

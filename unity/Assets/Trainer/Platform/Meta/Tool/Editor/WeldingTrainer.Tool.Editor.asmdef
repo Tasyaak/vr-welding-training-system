@@ -1,0 +1,13 @@
+{
+  "name": "WeldingTrainer.Tool.Editor",
+  "references": [
+    "WeldingTrainer.Tool",
+    "WeldingTrainer.Tool.Unity",
+    "WeldingTrainer.Tool.Preview",
+    "Oculus.VR"
+  ],
+  "autoReferenced": false,
+  "includePlatforms": [
+    "Editor"
+  ]
+}

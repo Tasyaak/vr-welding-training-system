@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework Condition="'$(ToolTargetFramework)' == ''">net9.0</TargetFramework><TargetFramework Condition="'$(ToolTargetFramework)' != ''">$(ToolTargetFramework)</TargetFramework><EnableDefaultCompileItems>false</EnableDefaultCompileItems><TreatWarningsAsErrors>true</TreatWarningsAsErrors></PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="../../unity/Assets/Trainer/Content/Spatial/Runtime/*.cs" />
+    <Compile Include="../../unity/Assets/Trainer/Platform/Meta/Tool/Runtime/*.cs" />
+    <Compile Include="../../unity/Assets/Trainer/Platform/Meta/Tool/Tests/Editor/ToolTestCases.cs" />
+  </ItemGroup>
+</Project>
