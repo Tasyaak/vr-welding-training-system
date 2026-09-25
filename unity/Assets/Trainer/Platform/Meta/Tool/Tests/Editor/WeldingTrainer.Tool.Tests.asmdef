@@ -1,0 +1,18 @@
+{
+  "name": "WeldingTrainer.Tool.Tests",
+  "references": [
+    "WeldingTrainer.Tool",
+    "WeldingTrainer.Tool.Unity",
+    "WeldingTrainer.Content.Spatial",
+    "WeldingTrainer.Content.Spatial.Unity",
+    "Unity.InputSystem",
+    "Unity.XR.OpenXR"
+  ],
+  "autoReferenced": false,
+  "includePlatforms": [
+    "Editor"
+  ],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "name": "WeldingTrainer.Tool.Preview",
+  "references": [
+    "WeldingTrainer.Tool",
+    "WeldingTrainer.Tool.Unity",
+    "WeldingTrainer.Content.Spatial",
+    "WeldingTrainer.Content.Spatial.Unity",
+    "Oculus.VR"
+  ],
+  "autoReferenced": false
+}
