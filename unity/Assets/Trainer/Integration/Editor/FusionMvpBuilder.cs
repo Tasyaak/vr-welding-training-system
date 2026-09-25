@@ -34,10 +34,6 @@ namespace WeldingTrainer.Integration.Editor
             EditorSceneManager.OpenScene("Assets/Trainer/Integration/RegistrationPreview.unity");
             foreach (var driver in Object.FindObjectsByType<RegistrationTrainingDemoDriver>(FindObjectsInactive.Include, FindObjectsSortMode.None))
                 Object.DestroyImmediate(driver);
-            foreach (var visuals in Object.FindObjectsByType<RegisteredAssemblyVisuals>(FindObjectsInactive.Include, FindObjectsSortMode.None))
-                Object.DestroyImmediate(visuals);
-            foreach (var driver in Object.FindObjectsByType<RegisteredAssemblyPoseDriver>(FindObjectsInactive.Include, FindObjectsSortMode.None))
-                Object.DestroyImmediate(driver);
             foreach (var text in Object.FindObjectsByType<TextMesh>(FindObjectsInactive.Include, FindObjectsSortMode.None))
                 Object.DestroyImmediate(text.gameObject);
             var bridge = Object.FindFirstObjectByType<QuestRegistrationBridge>();
@@ -45,6 +41,8 @@ namespace WeldingTrainer.Integration.Editor
             bridge.adapterQualification = AssetDatabase.LoadAssetAtPath<WeldingTrainer.Registration.Meta.QrAdapterQualification>("Assets/Trainer/Integration/Quest3QrB.asset");
             bridge.beginOnStart = false;
             bridge.diagnosticQrLogging = false;
+            var assemblyVisuals = Object.FindFirstObjectByType<RegisteredAssemblyVisuals>();
+            assemblyVisuals.showFixture = false;
             var root = new GameObject("Fusion MVP - production composition");
             root.SetActive(false);
             var right = root.AddComponent<RightControllerSource>();

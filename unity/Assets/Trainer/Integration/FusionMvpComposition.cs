@@ -123,6 +123,10 @@ namespace WeldingTrainer.Integration
         {
             double now = Seconds;
             CaptureFrame(now);
+            // Registration.Refresh() timestamps its snapshot while reading. Use a
+            // subsequent monotonic time for the rest of this frame; otherwise a
+            // newly Registered snapshot appears to be captured in the future.
+            now = Seconds;
             if (finishNextTick)
             {
                 finishNextTick = false;
@@ -185,7 +189,8 @@ namespace WeldingTrainer.Integration
 #endif
             tool = right.Capture();
             spatial = registration.Refresh();
-            spatialValid = spatial != null && spatial.IsUsableAt(now, spatial.OriginGeneration) && spatial.WorldFromWorkpiece.HasValue;
+            double capturedAt = Seconds;
+            spatialValid = spatial != null && spatial.IsUsableAt(capturedAt, spatial.OriginGeneration) && spatial.WorldFromWorkpiece.HasValue;
             if (spatial?.Binding != null && binding == null)
             {
                 binding = spatial.Binding;
@@ -210,7 +215,7 @@ namespace WeldingTrainer.Integration
 
             if (spatialValid)
                 worldFromWorkpiece = spatial.WorldFromWorkpiece.Value;
-            poseValid = tool.IsUsableAt(now, tool.OriginGeneration) && !lifecycleInvalid;
+            poseValid = tool.IsUsableAt(capturedAt, tool.OriginGeneration) && !lifecycleInvalid;
             if (poseValid && spatialValid)
             {
                 var inverse = worldFromWorkpiece.Inverse();

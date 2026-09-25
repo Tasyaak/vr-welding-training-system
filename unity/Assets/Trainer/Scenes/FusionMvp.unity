@@ -400,6 +400,8 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 522246754}
+  - component: {fileID: 522246755}
+  - component: {fileID: 522246756}
   m_Layer: 0
   m_Name: RegisteredAssemblyPresentation
   m_TagString: Untagged
@@ -422,6 +424,41 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1419141171}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &522246755
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 522246753}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b2b060397f6b36756b3af6631812d7bc, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: WeldingTrainer.Integration::WeldingTrainer.Integration.RegisteredAssemblyPoseDriver
+  registration: {fileID: 506771982}
+  fixtureRoot: {fileID: 0}
+  workpieceRoot: {fileID: 0}
+  showPreviewPose: 1
+  hideWhenUnavailable: 1
+--- !u!114 &522246756
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 522246753}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 36c143477286aa3daaaae0ef0b5c3c28, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: WeldingTrainer.Integration::WeldingTrainer.Integration.RegisteredAssemblyVisuals
+  registration: {fileID: 506771982}
+  poseDriver: {fileID: 522246755}
+  fixtureMaterial: {fileID: 2100000, guid: cc02355df3995804abd3a2ec7e59cb34, type: 2}
+  workpieceMaterial: {fileID: 2100000, guid: ef92c0dfe790f99e58052e349417dc05, type: 2}
+  showFixture: 0
+  logBuild: 1
 --- !u!1 &794036531
 GameObject:
   m_ObjectHideFlags: 0

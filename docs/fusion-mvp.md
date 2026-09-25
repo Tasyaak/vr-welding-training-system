@@ -25,9 +25,14 @@ Unity: 6000.3.24f1. Existing package versions are unchanged.
    is insufficient. A from results creates a new attempt with a fresh clamp step.
 
 The display presents the authoritative block reason, prioritized coaching,
-speed, path error, travel/work angles, attempted and acceptable coverage. Start
-and end markers and a thin seam guide leave the physical part visible. The tip
-line uses the existing calibrated right-tool poses. Active Fusion produces sparks
+speed, path error, travel/work angles, attempted and acceptable coverage. The
+registered workpiece now uses the same imported CAD mesh and `WorkpieceMetal`
+Meta Depth URP material as the physical registration rehearsal; the fixture ghost
+is hidden in the Fusion scene. The model follows the registration snapshot through
+the existing presentation-only pose driver, while scoring continues to use the
+immutable Workpiece pose. Start and end markers and a thin seam guide remain
+visible on the part. The tip line uses the existing calibrated right-tool poses.
+Active Fusion produces sparks
 and a scalloped metal bead that cools; poor intervals remain bronze. These are
 training visuals, with no thermal, penetration or metallurgy claim.
 
@@ -139,6 +144,25 @@ The three `FusionMvpTests` cover stopped-gap attribution/end-touch, assistance
 versus independent generations, and valid-time statistics. Actual checks and
 limitations are recorded in the PR; do not treat desktop rehearsal as Quest proof.
 
+### Quest report follow-up
+
+The first Quest run reported `QR Registered: None` after Anchoring with no usable
+training state. The join layer sampled its `now` before `registration.Refresh()`;
+the returned snapshot's `CapturedAt` was therefore slightly later, so
+`IsUsableAt(now)` rejected a freshly Registered snapshot. The join layer now
+validates against a monotonic timestamp taken after the read. The same run's QR
+runtime tuple matched `Quest3QrB`; Meta Depth URP and the selected workpiece
+material were already present in the registration scene. The Fusion scene now
+retains that presentation component and material. Hardware re-test is pending.
+
+After this correction, Unity 6000.3.24f1 compiled the updated scene and the
+Editor-only rehearsal passed (`FUSION_REHEARSAL_PASS`, about 184 mm attempted,
+173 mm acceptable, 7.36 s active, summary saved). Repository checks passed:
+48 spatial, 77 registration and 14 tool cases. These checks do not establish
+physical Quest registration, Meta Depth occlusion or welding output; the next
+device run must verify the `QR Registered` to `Selecting`/`Ready` transition,
+model alignment, active bead and final results.
+
 ### Verification performed on 2026-09-25
 
 - Unity Editor compilation and scene generation: PASS.
@@ -151,6 +175,7 @@ limitations are recorded in the PR; do not treat desktop rehearsal as Quest proo
 - Rendered [welding](fusion-mvp-evidence/fusion-welding.png) and
   [results](fusion-mvp-evidence/fusion-results.png) inspected after fixing HUD
   size/framing. No project runtime exception in the final rehearsal.
-- ADB: no connected device. No new Quest run, APK build, device audio/haptic,
-  stereo, performance or registration-accuracy PASS is claimed. Android build
-  entry point is `FusionMvpBuilder.BuildAndroid`; device acceptance remains next.
+- At initial PR publication, ADB had no connected device and no APK/device PASS
+  was claimed. The owner subsequently supplied the first Quest log described
+  above. The corrected build still awaits device verification of audio/haptics,
+  occlusion, stereo, performance and registration alignment.

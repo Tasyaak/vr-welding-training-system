@@ -233,7 +233,10 @@ namespace WeldingTrainer.Presentation
                 return;
             title.text = "FUSION  /  TRAINING";
             status.text = Status;
-            cue.text = feedback.VisualStrength > 0 ? CueText(feedback.PrimaryCue) : "Coaching off";
+            cue.text = feedback.VisualStrength > 0 ? CueText(feedback.PrimaryCue) :
+                summary == null && Status != null && Status.StartsWith("QR ", StringComparison.Ordinal)
+                    ? "Register the secured workpiece to begin"
+                    : "Coaching off";
             cue.color = feedback.Mandatory ? new Color(1, .55f, .2f) : new Color(.3f, 1, .75f);
         }
 
