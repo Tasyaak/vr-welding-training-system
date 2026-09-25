@@ -9,7 +9,10 @@
     "WeldingTrainer.Registration",
     "WeldingTrainer.Registration.Meta",
     "Oculus.VR",
-    "meta.xr.mrutilitykit"
+    "meta.xr.mrutilitykit",
+    "WeldingTrainer.Tool",
+    "WeldingTrainer.Tool.Unity",
+    "WeldingTrainer.Presentation"
   ],
   "autoReferenced": false
 }

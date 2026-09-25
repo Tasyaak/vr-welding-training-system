@@ -29,6 +29,7 @@ namespace WeldingTrainer.Integration
         [Header("Presentation materials")]
         public Material fixtureMaterial;
         public Material workpieceMaterial;
+        public bool showFixture = true;
 
         [Header("Diagnostics")]
         public bool logBuild = true;
@@ -104,10 +105,11 @@ namespace WeldingTrainer.Integration
             presentationMeshes.Add(fixtureMesh);
             presentationMeshes.Add(workpieceMesh);
 
-            fixtureRoot = CreateVisual(
-                "FixtureVisual",
-                fixtureMesh,
-                fixtureMaterial);
+            if (showFixture)
+                fixtureRoot = CreateVisual(
+                    "FixtureVisual",
+                    fixtureMesh,
+                    fixtureMaterial);
 
             workpieceRoot = CreateVisual(
                 "WorkpieceVisual",
